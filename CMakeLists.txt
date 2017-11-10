@@ -17,6 +17,7 @@ endif(NOT CMAKE_BUILD_TYPE)
 # BUILD OPTIONS
 #===============================================================================
 option(SMESH_BUILD_TESTS "Build smesh tests" OFF)
+option(SMESH_WITH_TINYPLY "Include tinyply for PLY file io" ON)
 
 
 
@@ -55,6 +56,15 @@ add_definitions(
 find_package(glog REQUIRED)
 
 
+find_package(Eigen3 3.3 REQUIRED)
+if (EIGEN3_FOUND)
+    include_directories(SYSTEM ${EIGEN3_INCLUDE_DIRS})
+endif()
+
+
+if (SMESH_WITH_TINYPLY)
+	add_definitions(-DWITH_TINYPLY)
+endif (SMESH_WITH_TINYPLY)
 
 
 

@@ -4,11 +4,15 @@
 
 
 
+#include <fstream>
+
 
 #include <tinyply.h>
 
 
 
+
+namespace smesh {
 
 
 
@@ -23,7 +27,7 @@ inline void save_ply(const MESH& mesh, std::string filename, bool binary = true)
 	tinyply::PlyFile myFile;
 
 	std::vector<float> verts;
-	verts.reserve(mesh.verts.size() * 3);
+	verts.reserve(mesh.verts.size_including_deleted() * 3);
 	for(auto& v : mesh.verts) {
 		verts.push_back(v.pos[0]);
 		verts.push_back(v.pos[1]);
@@ -32,7 +36,7 @@ inline void save_ply(const MESH& mesh, std::string filename, bool binary = true)
 
 
 	std::vector<int32_t> vertexIndicies;
-	vertexIndicies.reserve(mesh.polys.size() * 3);
+	vertexIndicies.reserve(mesh.polys.size_including_deleted() * 3);
 	for(auto& p : mesh.polys) {
 		vertexIndicies.push_back(p.verts[0].vert.idx);
 		vertexIndicies.push_back(p.verts[1].vert.idx);
@@ -63,6 +67,16 @@ inline void save_ply(const MESH& mesh, std::string filename, bool binary = true)
 
 
 
+} // namespace smesh
+
+
+
+#else
+
+template<class MESH>
+inline void save_ply(const MESH& mesh, std::string filename, bool binary = true) {
+	static_assert(false, "WITH_TINYPLY required");
+}
 
 
 #endif
