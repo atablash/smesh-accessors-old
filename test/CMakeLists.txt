@@ -5,7 +5,10 @@ find_package(Threads REQUIRED)
 
 
 
-set(sources compute-normals.cpp)
+set(sources
+	compute-normals.cpp
+	elinks.cpp
+)
 
 if (SMESH_WITH_TINYPLY)
 	set(sources ${sources} ../third-party/tinyply.cpp)

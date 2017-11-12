@@ -104,6 +104,85 @@ public:
 
 
 
+private:
+
+	// internal raw structs for storage
+	struct Vert;
+	struct Poly;
+	struct Poly_Vert;
+
+
+
+private:
+	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
+	class   Iterator;
+
+	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
+	class C_Iterator;
+
+	template<class A, class CONTAINER, class EXTRA = Smesh&, class GET_A = A>
+	class Index_Iterator;
+
+
+public:
+	class A_Verts;
+	class A_Polys;
+
+
+	class  A_Vert;
+	class CA_Vert;
+	using  I_Vert =   Index_Iterator< A_Vert, std::vector<Vert>>;
+	using CI_Vert =   Index_Iterator<CA_Vert, std::vector<Vert>>;
+
+
+	class  A_Poly;
+	class CA_Poly;
+	using  I_Poly =   Index_Iterator< A_Poly, std::vector<Poly>>;
+	using CI_Poly =   Index_Iterator<CA_Poly, std::vector<Poly>>;
+
+
+
+	class  A_Poly_Verts;
+
+	class  A_Poly_Vert;
+	class CA_Poly_Vert;
+
+	template<class A>
+	struct Get_A_Double_Idx {
+		Get_A_Double_Idx(const std::pair<Smesh&,int>& p, int i1) :
+			smesh(p.first), idx0(p.second), idx1(i1) {}
+
+		operator A() {
+			return A(smesh, idx0, idx1);
+		}
+
+	private:
+		Smesh& smesh;
+		int idx0;
+		int idx1;
+	};
+
+	// extra is Smesh& and int (poly index)
+	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
+		std::pair<Smesh&,int>, Get_A_Double_Idx<A_Poly_Vert>>;
+
+	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
+		std::pair<Smesh&,int>, Get_A_Double_Idx<A_Poly_Vert>>;
+
+
+
+	class  A_Poly_Edges;
+
+	class  A_Poly_Edge;
+	using  I_Poly_Edge = Index_Iterator< A_Poly_Edge, std::array<Poly_Vert, POLY_SIZE>,
+		std::pair<Smesh&,int>, Get_A_Double_Idx<A_Poly_Edge>>;
+
+
+
+
+
+
+
 	//
 	// handles
 	// TODO: implement small handles
@@ -112,9 +191,18 @@ public:
 	//
 	// a handle to either polygon's vertex or edge (half-edge)
 	//
-	struct H_poly_vert{
+	struct H_Poly_Vert{
 		int32_t poly = -1;
 		int8_t vert = -1; // 0, 1 or 2
+	};
+
+	struct H_Poly_Edge {
+		int32_t poly = -1;
+		int8_t edge = -1; // 0, 1 or 2
+
+		A_Poly_Edge get(Smesh& smesh) {
+			return A_Poly_Edge(smesh, poly, edge);
+		}
 	};
 
 
@@ -133,13 +221,13 @@ private:
 		Vert(A_POS && a_pos) : pos( std::forward<A_POS>(a_pos) ) {}
 		
 		Pos pos = {0,0,0};
-		//std::vector<H_poly_vert> polygons;
+		//std::vector<H_Poly_Vert> polygons;
 	};
 	
 	struct Poly_Vert : public Poly_Vert_Props { // vertex and corresponidng edge
 		Idx idx; // vertex index
 		//int32_t idx_prop; // property-vertex index
-		H_poly_vert elink; // link to the other half-edge
+		H_Poly_Vert elink; // link to the other half-edge
 	};
 	
 	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)> {
@@ -195,7 +283,7 @@ private:
 	//
 	// it's not random access because of `del` flags
 	//
-	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
+	template<class A, class T, class EXTRA, class GET_A>
 	class Iterator {
 	public:
 		Iterator& operator++() {
@@ -271,25 +359,25 @@ private:
 	// const iterator
 	// wraps const T*, returns accessor const A
 	//
-	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
+	template<class A, class T, class EXTRA, class GET_A>
 	class C_Iterator {
 	public:
 		C_Iterator& operator++() {
-			++p;
+			increment();
 			return *this; }
 
 		C_Iterator operator++(int) {
 			auto old = *this;
-			++p;
+			increment();
 			return old; }
 
 		C_Iterator& operator--() {
-			--p;
+			decrement();
 			return *this; }
 
 		C_Iterator operator--(int) {
 			auto old = *this;
-			--p;
+			decrement();
 			return old; }
 
 
@@ -344,25 +432,25 @@ private:
 
 
 private:
-	template<class A, class CONTAINER, class EXTRA = Smesh&, class GET_A = A>
+	template<class A, class CONTAINER, class EXTRA, class GET_A>
 	class Index_Iterator {
 	public:
 		Index_Iterator& operator++() {
-			++idx;
+			increment();
 			return *this; }
 
 		Index_Iterator operator++(int) {
 			auto old = *this;
-			++idx;
+			increment();
 			return old; }
 
 		Index_Iterator& operator--() {
-			--idx;
+			decrement();
 			return *this; }
 
 		Index_Iterator operator--(int) {
 			auto old = *this;
-			--idx;
+			decrement();
 			return old; }
 
 
@@ -387,7 +475,18 @@ private:
 
 		const A operator*() const {
 			// const cast to avoid defining a separate const_iterator
-			return GET_A(extra, const_cast<CONTAINER&>(container), idx);
+			return GET_A(extra, idx);
+		}
+
+
+	private:
+		inline void increment() {
+			do ++idx; while(idx < (int)container.size() && _smesh_detail::is_deleted(container[idx]));
+		}
+
+		inline void decrement() {
+			// I believe decrementing `begin` is undefined anyway
+			do --idx; while(idx > 0 && _smesh_detail::is_deleted(container[idx]));
 		}
 
 
@@ -395,6 +494,9 @@ private:
 		Index_Iterator(const EXTRA& ex, const CONTAINER& co, int i) :
 				extra(ex), container(co), idx(i) {
 			DCHECK_GE(i, 0) << "iterator constructor: index out of range";
+
+			// can be equal to container.size() for end() iterators
+			DCHECK_LE(i, container.size()) << "iterator constructor: index out of range";
 		}
 
 	private:
@@ -415,39 +517,6 @@ private:
 //
 ////////////////////////////////////////////////////////////////////////////////
 public:
-	
-	class A_Verts;
-	class A_Polys;
-
-
-	class  A_Vert;
-	class CA_Vert;
-	using  I_Vert =   Iterator< A_Vert, Vert>;
-	using CI_Vert = C_Iterator<CA_Vert, Vert>;
-
-
-	class  A_Poly;
-	class CA_Poly;
-	using  I_Poly =   Iterator< A_Poly, Poly>;
-	using CI_Poly = C_Iterator<CA_Poly, Poly>;
-
-
-
-	class A_Poly_Verts;
-
-	class  A_Poly_Vert;
-	class CA_Poly_Vert;
-	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>>;
-	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>>;
-
-
-
-	class A_Poly_Edges;
-
-	class A_Poly_Edge;
-	
-
-
 
 	
 	class A_Verts {
@@ -465,7 +534,7 @@ public:
 		
 		A_Vert add(const Pos_Float& x, const Pos_Float& y, const Pos_Float& z) {
 			smesh.raw_verts.emplace_back(Pos{x,y,z});
-			return A_Vert(smesh, smesh.raw_verts.back());
+			return A_Vert(smesh, smesh.raw_verts.size()-1);
 		}
 		
 		void reserve(int n) {
@@ -491,31 +560,31 @@ public:
 		
 		A_Vert operator[](int idx) {
 			check_idx(idx);
-			return A_Vert{smesh, smesh.raw_verts[idx]};
+			return A_Vert{smesh, idx};
 		}
 
 		CA_Vert operator[](int idx) const {
 			check_idx(idx);
-			return CA_Vert{smesh, smesh.raw_verts[idx]};
+			return CA_Vert{smesh, idx};
 		}
 
 
 		// iterator
 		I_Vert begin() {
-			return I_Vert(smesh, &*smesh.raw_verts.begin(), &*smesh.raw_verts.begin(), &*smesh.raw_verts.end());
+			return I_Vert(smesh, smesh.raw_verts, 0);
 		}
 
 		I_Vert end() {
-			return I_Vert(smesh, &*smesh.raw_verts.end(), &*smesh.raw_verts.begin(), &*smesh.raw_verts.end());
+			return I_Vert(smesh, smesh.raw_verts, smesh.raw_verts.size());
 		}
 
 		// const iterator
 		CI_Vert begin() const {
-			return CI_Vert(smesh, &*smesh.raw_verts.begin(), &*smesh.raw_verts.begin(), &*smesh.raw_verts.end());
+			return CI_Vert(smesh, smesh.raw_verts, 0);
 		}
 
 		CI_Vert end() const {
-			return CI_Vert(smesh, &*smesh.raw_verts.end(), &*smesh.raw_verts.begin(), &*smesh.raw_verts.end());
+			return CI_Vert(smesh, smesh.raw_verts, smesh.raw_verts.size());
 		}
 
 
@@ -542,7 +611,7 @@ public:
 			p.verts[1].idx = i1;
 			p.verts[2].idx = i2;
 			smesh.raw_polys.emplace_back(std::move(p));
-			return A_Poly(smesh, smesh.raw_polys.back());
+			return A_Poly(smesh, smesh.raw_polys.size()-1);
 		}
 		
 		void reserve( int n ) {
@@ -568,20 +637,20 @@ public:
 
 		// iterator
 		I_Poly begin() {
-			return I_Poly(smesh, &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin());
+			return I_Poly(smesh, smesh.raw_polys, 0);
 		}
 
 		I_Poly end() {
-			return I_Poly(smesh, &*smesh.raw_polys.end(), &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin());
+			return I_Poly(smesh, smesh.raw_polys, smesh.raw_polys.size());
 		}
 
 		// const iterator
 		CI_Poly begin() const {
-			return CI_Poly(smesh, &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin());
+			return CI_Poly(smesh, smesh.raw_polys, 0);
 		}
 
 		CI_Poly end() const {
-			return CI_Poly(smesh, &*smesh.raw_polys.end(), &*smesh.raw_polys.begin(), &*smesh.raw_polys.begin());
+			return CI_Poly(smesh, smesh.raw_polys, smesh.raw_polys.size());
 		}
 		
 	// store environment:
@@ -607,27 +676,26 @@ public:
 		Pos& pos;
 		Vert_Props& props;
 
-		int idx;
+		const int idx;
 
 		void remove() {
-			DCHECK( !vert.del );
-			vert.del = true;
+			DCHECK( !smesh.raw_verts[idx].del );
+			smesh.raw_verts[idx].del = true;
 		}
 
 	// store environment:
 	private:
-		A_Vert( Smesh& a_smesh,  Vert& a_vert)  :
-				pos(    a_vert.pos ),
-				props(  a_vert ),
-				idx(    &a_vert - &a_smesh.raw_verts[0] ),
-				vert(   a_vert ) {
+		A_Vert( Smesh& m, int v)  :
+				pos( m.raw_verts[v].pos ),
+				props( m.raw_verts[v] ),
+				idx(v),
+				smesh(m) {
 
 			if constexpr(bool(Flags & Smesh_Flags::VERTS_LAZY_DEL))
-				DCHECK(!vert.del) << "vertex is already deleted";
+				DCHECK(!m.raw_verts[v].del) << "vertex is already deleted";
 		}
 		
-		//Smesh& smesh;
-		Vert& vert;
+		Smesh& smesh;
 		
 		friend Smesh;
 	};
@@ -683,23 +751,27 @@ public:
 		Poly_Props& props;
 
 		void remove() {
-			DCHECK( !poly.del );
-			poly.del = true;
+			DCHECK( !smesh.raw_polys[poly].del );
+			smesh.raw_polys[poly].del = true;
 		}
 
 		A_Poly_Verts verts;
+		A_Poly_Edges edges;
 
 
 	private:
-		A_Poly( Smesh& a_smesh,  Poly& a_poly )  :
-				props(a_poly),
-				verts(a_smesh, a_poly),
-				poly(a_poly) {
+		A_Poly( Smesh& m, int p )  :
+				props(m.raw_polys[p]),
+				verts(m, p),
+				edges(m, p),
+				smesh(m),
+				poly(p) {
 
 			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
-				DCHECK( !poly.del ) << "polygon is deleted";
+				DCHECK( !m.raw_polys[p].del ) << "polygon is deleted";
 		}
-		Poly& poly;
+		Smesh& smesh;
+		int poly;
 
 		friend Smesh;
 	};
@@ -711,13 +783,15 @@ public:
 		Poly_Props& props;
 
 		A_Poly_Verts verts;
+		A_Poly_Edges edges;
 
 
 	private:
-		CA_Poly( const Smesh& a_smesh, const Poly& a_poly )  :
-				props(a_poly),
-				verts(a_smesh, a_poly),
-				poly(a_poly) {
+		CA_Poly( const Smesh& m, const Poly& p )  :
+				props(p),
+				verts(m, p),
+				edges(m, p),
+				poly(p) {
 
 			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
 				DCHECK( !poly.del ) << "polygon is deleted";
@@ -746,20 +820,20 @@ public:
 
 		A_Poly_Vert operator[]( int i ) {
 			check_idx(i);
-			return A_Poly_Vert( smesh, poly.verts, i );
+			return A_Poly_Vert( smesh, poly, i );
 		}
 
 		CA_Poly_Vert operator[]( int i ) const {
 			check_idx(i);
-			return CA_Poly_Vert( smesh, poly.verts, i );
+			return CA_Poly_Vert( smesh, poly, i );
 		}
 
 		I_Poly_Vert begin() {
-			return I_Poly_Vert( smesh, poly.verts, 0 );
+			return I_Poly_Vert( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
 		}
 
 		I_Poly_Vert end() {
-			return I_Poly_Vert( smesh, poly.verts, POLY_SIZE );
+			return I_Poly_Vert( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
 		}
 
 	private:
@@ -769,13 +843,56 @@ public:
 		}
 
 	private:
-		A_Poly_Verts( Smesh& s, Poly& p ) : smesh(s), poly(p) {}
+		A_Poly_Verts( Smesh& s, int p ) : smesh(s), poly(p) {}
 		Smesh& smesh;
-		Poly& poly;
+		int poly;
 
 		friend Smesh;
 	};
 
+
+
+
+
+
+public:
+	class A_Poly_Edges {
+	public:
+		constexpr int size() const {
+			return POLY_SIZE;
+		}
+
+		A_Poly_Edge operator[]( int i ) {
+			check_idx(i);
+			return A_Poly_Edge( smesh, poly, i );
+		}
+
+		A_Poly_Edge operator[]( int i ) const {
+			check_idx(i);
+			return A_Poly_Edge( smesh, poly, i );
+		}
+
+		I_Poly_Edge begin() {
+			return I_Poly_Edge( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
+		}
+
+		I_Poly_Edge end() {
+			return I_Poly_Edge( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
+		}
+
+	private:
+		inline void check_idx(int i) {
+			DCHECK_GE(i, 0) << "A_Poly_Verts::operator[]: index out of range";
+			DCHECK_LT(i, POLY_SIZE) << "A_Poly_Verts::operator[]: index out of range";
+		}
+
+	private:
+		A_Poly_Edges( Smesh& s, int p ) : smesh(s), poly(p) {}
+		Smesh& smesh;
+		int poly;
+
+		friend Smesh;
+	};
 
 
 
@@ -797,14 +914,14 @@ public:
 
 		A_Poly_Vert prev() const {
 			int n = POLY_SIZE;//verts.size();
-			int new_pv_idx = (pv_idx + n - 1) % n;
-			return A_Poly_Vert(smesh, verts, new_pv_idx);
+			int new_poly_vert = (poly_vert + n - 1) % n;
+			return A_Poly_Vert(smesh, poly, new_poly_vert);
 		}
 
 		A_Poly_Vert next() const {
 			int n = POLY_SIZE;//verts.size();
-			int new_pv_idx = (pv_idx + 1) % n;
-			return A_Poly_Vert(smesh, verts, new_pv_idx);
+			int new_poly_vert = (poly_vert + 1) % n;
+			return A_Poly_Vert(smesh, poly, new_poly_vert);
 		}
 
 
@@ -814,21 +931,21 @@ public:
 			DCHECK_LT(i, POLY_SIZE) << "A_Poly_Verts::operator[]: index out of range";
 		}
 
-		A_Poly_Vert( Smesh& m, std::array<Poly_Vert, POLY_SIZE>& vs, int i ) :
-				pos( m.raw_verts[ vs[i].idx ].pos ),
-				vert( m, m.raw_verts[ vs[i].idx ] ),
-				props( vs[i] ),
+		A_Poly_Vert( Smesh& m, int p, int pv ) :
+				pos( m.raw_verts[ m.raw_polys[p].verts[pv].idx ].pos ),
+				vert( m, m.raw_polys[p].verts[pv].idx ),
+				props( m.raw_polys[p].verts[pv] ),
 				smesh(m),
-				verts(vs),
-				pv_idx( i ) {
+				poly(p),
+				poly_vert( pv ) {
 
-			check_idx(i);
+			check_idx(pv);
 		}
 
 		Smesh& smesh;
 
-		std::array<Poly_Vert, POLY_SIZE>& verts;
-		const int pv_idx;
+		const int poly;
+		const int poly_vert;
 
 		friend Smesh;
 	};
@@ -894,38 +1011,60 @@ public:
 	class A_Poly_Edge { // or half-edge
 	public:
 		A_Poly_Edge link() {
-			const auto& l = poly_vert.elink;
-			auto& poly = smesh.raw_polys[ l.poly ];
-			return A_Poly_Edge( smesh,  poly,  poly.verts[ l.vert ] );
+			const auto& l = raw().elink;
+			DCHECK_GE(l.poly, 0); DCHECK_LT(l.poly, smesh.raw_polys.size());
+			DCHECK_GE(l.vert, 0); DCHECK_LT(l.vert, 3);
+			return A_Poly_Edge( smesh, l.poly, l.vert );
 		}
 
-		const A_Poly_Edge link() const {
-			const auto& l = poly_vert.elink;
-			auto& poly = smesh.raw_polys[ l.poly ];
-			return A_Poly_Edge( smesh,  poly,  poly.verts[ l.vert ] );
+		void link(A_Poly_Edge& other_poly_edge) {
+			DCHECK(!has_link()) << "edge is already linked";
+			DCHECK(!other_poly_edge.has_link()) << "other edge is already linked";
+
+			// check if common vertices are shared
+			DCHECK_EQ(verts[0].idx, other_poly_edge.verts[1].idx);
+			DCHECK_EQ(verts[1].idx, other_poly_edge.verts[0].idx);
+
+			// 2-way
+			raw().elink = edge_to_vert(other_poly_edge.handle);
+			other_poly_edge.raw().elink = edge_to_vert(handle);
 		}
 
-
-		A_Poly poly() {
-			return A_Poly( smesh,  my_poly );
+		inline bool has_link() {
+			return raw().elink.poly != -1;
 		}
 
-		const A_Poly poly() const {
-			return A_Poly( smesh,  my_poly );
+		A_Poly poly;
+
+		H_Poly_Edge handle;
+
+		std::array<A_Vert, 2> verts;
+
+	private:
+		auto& raw() {
+			return smesh.raw_polys[handle.poly].verts[handle.edge];
+		}
+
+		static inline H_Poly_Vert edge_to_vert(const H_Poly_Edge& x) {
+			return {x.poly, x.edge};
 		}
  
 	private:
-		A_Poly_Edge( Smesh& a_smesh,  Poly& a_poly,  Poly_Vert& a_poly_vert ) :
-			smesh( a_smesh ),
-			my_poly( a_poly ),
-			poly_vert( a_poly_vert )  {}
+		A_Poly_Edge( Smesh& m, int p, int8_t pv ) :
+			poly( m, p ),
+			handle{p,pv},
+			verts({A_Vert{m, m.raw_polys[p].verts[pv].idx},
+			       A_Vert{m, m.raw_polys[p].verts[(pv+1)%POLY_SIZE].idx}}),
+			smesh( m ) {}
 
 		Smesh& smesh;
-		Poly& my_poly;
-		Poly_Vert&  poly_vert;
 
 		friend Smesh;
 	};
+
+
+
+
 	
 	
 }; // class Smesh
