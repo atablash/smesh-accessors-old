@@ -27,7 +27,7 @@ install:
 script:
   # build
   - cmake -DSMESH_BUILD_TESTS=ON .
-  - make
+  - make VERBOSE=1
   - ctest --verbose
 
 notifications:

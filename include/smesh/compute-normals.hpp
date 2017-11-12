@@ -24,9 +24,8 @@ void fast_compute_normals( MESH& mesh,
 		auto v02 = p.verts[2].pos - p.verts[0].pos;
 		auto normal = v01.cross(v02);
 		normal.normalize();
-std::cout << "A" << std::endl;
+
 		for(auto pv : p.verts) {
-std::cout << "B " << pv.vert.idx << std::endl;
 			get_v_normal(pv.vert.idx) += normal;
 			++nums[pv.vert.idx];
 		}
