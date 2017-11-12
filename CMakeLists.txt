@@ -54,7 +54,9 @@ add_definitions(
 # packages
 #===============================================================================
 find_package(glog REQUIRED)
-
+if (GLOG_FOUND)
+	link_libraries(glog)
+endif ()
 
 find_package(Eigen3 3.3 REQUIRED)
 if (EIGEN3_FOUND)

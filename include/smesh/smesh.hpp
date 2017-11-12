@@ -49,13 +49,13 @@ is_deleted(const T& t)
 //
 // mesh static flags
 //
-enum class Smesh_Options {
+enum class Smesh_Flags {
 	NONE = 0,
 	VERTS_LAZY_DEL = 0x0001,
 	POLYS_LAZY_DEL = 0x0002
 };
 
-ENABLE_BITMASK_OPERATORS(Smesh_Options)
+ENABLE_BITMASK_OPERATORS(Smesh_Flags)
 
 
 struct Void {};
@@ -68,24 +68,39 @@ template<bool> struct Add_Member_del { bool del = false; };
 template<>     struct Add_Member_del<false> {};
 
 
-
+struct Smesh_Options {
+	Void Vert_Props();
+	Void Poly_Props();
+	Void Poly_Vert_Props();
+};
 
 //
 // a triangle mesh structure with edge links (half-edges)
 //
 // - lazy removal of vertices or polygons (see bool del flag). TODO: remap support when no lazy removal
 //
-template <class F,
-	Smesh_Options OPTS =
-		Smesh_Options::VERTS_LAZY_DEL |
-		Smesh_Options::POLYS_LAZY_DEL,
-	class Vert_Props = Void,
-	class Poly_Props = Void,
-	class Poly_Vert_Props = Void
+template <
+	class POS_FLOAT,
+	Smesh_Flags FLAGS =
+		Smesh_Flags::VERTS_LAZY_DEL |
+		Smesh_Flags::POLYS_LAZY_DEL,
+	class OPTIONS = Smesh_Options
 >
 class Smesh {
-	using Pos = Eigen::Matrix<F,3,1>;
+
+public:
+	using Pos_Float = POS_FLOAT;
+	using Pos = Eigen::Matrix<Pos_Float,3,1>;
 	using Idx = int32_t; // vertex index type
+
+	using Vert_Props = decltype(OPTIONS().Vert_Props());
+	using Poly_Props = decltype(OPTIONS().Poly_Props());
+	using Poly_Vert_Props = decltype(OPTIONS().Poly_Vert_Props());
+
+	static constexpr Smesh_Flags Flags = FLAGS;
+
+
+	static const int POLY_SIZE = 3;
 
 
 
@@ -111,7 +126,7 @@ public:
 // internal structure types
 //
 private:
-	struct Vert : public Vert_Props, public Add_Member_del<bool(OPTS & Smesh_Options::VERTS_LAZY_DEL)> {
+	struct Vert : public Vert_Props, public Add_Member_del<bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)> {
 		Vert() {}
 		
 		template<class A_POS>
@@ -127,8 +142,8 @@ private:
 		H_poly_vert elink; // link to the other half-edge
 	};
 	
-	struct Poly : public Poly_Props, public Add_Member_del<bool(OPTS & Smesh_Options::POLYS_LAZY_DEL)> {
-		Poly_Vert verts[3];
+	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)> {
+		Poly_Vert verts[POLY_SIZE];
 	};
 	
 	
@@ -169,8 +184,8 @@ public:
 	// private typedefs - used for defining iterators to various things
 	//
 private:
-	template<class A, class T> class   Iterator;
-	template<class A, class T> class C_Iterator;
+	template<class A, class T, class EXTRA, class GET_A> class   Iterator;
+	template<class A, class T, class EXTRA, class GET_A> class C_Iterator;
 
 
 private:
@@ -180,7 +195,7 @@ private:
 	//
 	// it's not random access because of `del` flags
 	//
-	template<class A, class T>
+	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
 	class Iterator {
 	public:
 		Iterator& operator++() {
@@ -192,7 +207,7 @@ private:
 			increment();
 			return old; }
 
-		Iterator operator--() {
+		Iterator& operator--() {
 			decrement();
 			return *this; }
 
@@ -209,17 +224,19 @@ private:
 			return ! (*this == o); }
 
 
-		bool operator==(const C_Iterator<A,T>& o) const {
+		template<class AA, class EE, class GG>
+		bool operator==(const C_Iterator<AA,T,EE,GG>& o) const {
 			return p == o.p;
 		}
 
-		bool operator!=(const C_Iterator<A,T>& o) const {
+		template<class AA, class EE, class GG>
+		bool operator!=(const C_Iterator<AA,T,EE,GG>& o) const {
 			return ! (*this == o);
 		}
 
 
 		A operator*() const {
-			return A(smesh, *p);
+			return GET_A(extra, *p);
 		}
 
 
@@ -234,10 +251,10 @@ private:
 
 	private:
 		// need to store `begin` and `end` because of `del` flags
-		Iterator(Smesh& smesh_, T* p_, T* begin_, T* end_) :
-			smesh(smesh_), p(p_), begin(begin_), end(end_) {}
+		Iterator(const EXTRA& a_extra, T* a_p, T* a_begin, T* a_end) :
+			extra(a_extra), p(a_p), begin(a_begin), end(a_end) {}
 
-		Smesh& smesh;
+		EXTRA extra;
 		T* p;
 		const T* const begin;
 		const T* const end;
@@ -254,7 +271,7 @@ private:
 	// const iterator
 	// wraps const T*, returns accessor const A
 	//
-	template<class A, class T>
+	template<class A, class T, class EXTRA = Smesh&, class GET_A = A>
 	class C_Iterator {
 	public:
 		C_Iterator& operator++() {
@@ -266,7 +283,7 @@ private:
 			++p;
 			return old; }
 
-		C_Iterator operator--() {
+		C_Iterator& operator--() {
 			--p;
 			return *this; }
 
@@ -283,18 +300,19 @@ private:
 			return ! (*this == o); }
 
 
-		bool operator==(const Iterator<A,T>& o) const {
+		template<class AA, class EE, class GG>
+		bool operator==(const Iterator<AA,T,EE,GG>& o) const {
 			return p == o.p;
 		}
 
-		bool operator!=(const Iterator<A,T>& o) const {
+		template<class AA, class EE, class GG>
+		bool operator!=(const Iterator<AA,T,EE,GG>& o) const {
 			return ! (*this == o);
 		}
 
 
-		// we're returning const accessor, so it's safe to const_cast
 		const A operator*() const {
-			return A(const_cast<Smesh&>(smesh), const_cast<T&>(*p)); }
+			return GET_A(extra, *p); }
 
 
 	private:
@@ -308,11 +326,11 @@ private:
 
 	private:
 		// need to store `begin` and `end` because of `del` flags
-		C_Iterator(const Smesh& smesh_,
-			const T* p_, const T* begin_, const T* end_) :
-				smesh(smesh_), p(p_), begin(begin_), end(end_) {}
+		C_Iterator(EXTRA& a_extra,
+			const T* a_p, const T* a_begin, const T* a_end) :
+				extra(a_extra), p(a_p), begin(a_begin), end(a_end) {}
 
-		const Smesh& smesh;
+		EXTRA extra;
 		const T* p;
 		const T* const begin;
 		const T* const end;
@@ -321,6 +339,72 @@ private:
 	};
 
 
+
+
+
+
+private:
+	template<class A, class CONTAINER_REF, class EXTRA = Smesh&, class GET_A = A>
+	class Index_Iterator {
+	public:
+		Index_Iterator& operator++() {
+			++idx;
+			return *this; }
+
+		Index_Iterator operator++(int) {
+			auto old = *this;
+			++idx;
+			return old; }
+
+		Index_Iterator& operator--() {
+			--idx;
+			return *this; }
+
+		Index_Iterator operator--(int) {
+			auto old = *this;
+			--idx;
+			return old; }
+
+
+		// warning! safe to compare only iterators to same container (optimization)
+		bool operator==(const Index_Iterator& o) const {
+			return idx == o.idx; }
+
+		bool operator!=(const Index_Iterator& o) const {
+			return ! (*this == o); }
+
+
+		template<class AA, class EE, class GG>
+		bool operator==(const Index_Iterator<AA,CONTAINER_REF,EE,GG>& o) const {
+			return idx == o.idx;
+		}
+
+		template<class AA, class EE, class GG>
+		bool operator!=(const Index_Iterator<AA,CONTAINER_REF,EE,GG>& o) const {
+			return ! (*this == o);
+		}
+
+
+		const A operator*() const {
+			std::cout << "asd " << idx << " " << container[idx].idx << " " << container << std::endl;
+			return GET_A(extra, container, idx); }
+
+
+	private:
+		Index_Iterator(const EXTRA& ex, const CONTAINER_REF co, int i) :
+				extra(ex), container(co), idx(i) {
+			std::cout << "dupa0 " << 0 << " " << co[0].idx << " " << co << std::endl;
+			std::cout << "dupa3 " << 3 << " " << co[3].idx << " " << co << std::endl;
+			DCHECK_GE(i, 0) << "iterator constructor: index out of range";
+		}
+
+	private:
+		EXTRA extra;
+		const CONTAINER_REF container;
+		int idx;
+
+		friend Smesh;
+	};
 
 
 
@@ -339,13 +423,14 @@ public:
 
 	class  A_Vert;
 	class CA_Vert;
-	using  I_Vert =   Iterator<A_Vert, Vert>;
-	using CI_Vert = C_Iterator<A_Vert, Vert>;
+	using  I_Vert =   Iterator< A_Vert, Vert>;
+	using CI_Vert = C_Iterator<CA_Vert, Vert>;
 
 
 	class  A_Poly;
-	using  I_Poly =   Iterator<A_Poly, Poly>;
-	using CI_Poly = C_Iterator<A_Poly, Poly>;
+	class CA_Poly;
+	using  I_Poly =   Iterator< A_Poly, Poly>;
+	using CI_Poly = C_Iterator<CA_Poly, Poly>;
 
 
 
@@ -353,8 +438,8 @@ public:
 
 	class  A_Poly_Vert;
 	class CA_Poly_Vert;
-	using  I_Poly_Vert =   Iterator<A_Poly_Vert, Poly_Vert>;
-	using CI_Poly_Vert = C_Iterator<A_Poly_Vert, Poly_Vert>;
+	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, Poly_Vert*>;
+	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, Poly_Vert*>;
 
 
 
@@ -379,7 +464,7 @@ public:
 			return A_Vert{smesh, smesh.raw_verts.back()};
 		}
 		
-		A_Vert add(F x, F y, F z) {
+		A_Vert add(const Pos_Float& x, const Pos_Float& y, const Pos_Float& z) {
 			smesh.raw_verts.emplace_back(Pos{x,y,z});
 			return A_Vert(smesh, smesh.raw_verts.back());
 		}
@@ -394,14 +479,20 @@ public:
 
 		// todo: implement size() - take deleted verts into account!
 
+
+		inline void check_idx(int idx) {
+			DCHECK_GE(idx, 0) << "vertex index out of range";
+			DCHECK_LT(idx, (int)smesh.raw_verts.size()) << "vertex index out of range";
+		}
+
 		
 		A_Vert operator[](int idx) {
-			DCHECK(0 <= idx && idx < (int)smesh.raw_verts.size()) << "vertex index out of range";
+			check_idx(idx);
 			return A_Vert{smesh, smesh.raw_verts[idx]};
 		}
 
 		CA_Vert operator[](int idx) const {
-			DCHECK(0 <= idx && idx < (int)smesh.raw_verts.size()) << "vertex index out of range";
+			check_idx(idx);
 			return CA_Vert{smesh, smesh.raw_verts[idx]};
 		}
 
@@ -528,7 +619,7 @@ public:
 				idx(    &a_vert - &a_smesh.raw_verts[0] ),
 				vert(   a_vert ) {
 
-			if constexpr(bool(OPTS & Smesh_Options::VERTS_LAZY_DEL))
+			if constexpr(bool(Flags & Smesh_Flags::VERTS_LAZY_DEL))
 				DCHECK(!vert.del) << "vertex is already deleted";
 		}
 		
@@ -602,10 +693,33 @@ public:
 				verts(a_smesh, a_poly),
 				poly(a_poly) {
 
-			if constexpr(bool(OPTS & Smesh_Options::POLYS_LAZY_DEL))
+			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
 				DCHECK( !poly.del ) << "polygon is deleted";
 		}
 		Poly& poly;
+
+		friend Smesh;
+	};
+
+
+	class CA_Poly {
+	public:
+
+		Poly_Props& props;
+
+		A_Poly_Verts verts;
+
+
+	private:
+		CA_Poly( const Smesh& a_smesh, const Poly& a_poly )  :
+				props(a_poly),
+				verts(a_smesh, a_poly),
+				poly(a_poly) {
+
+			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
+				DCHECK( !poly.del ) << "polygon is deleted";
+		}
+		const Poly& poly;
 
 		friend Smesh;
 	};
@@ -619,33 +733,42 @@ public:
 
 
 
+
 public:
 	class A_Poly_Verts {
 	public:
-		int size() const {
-			return 3;
+		constexpr int size() const {
+			return POLY_SIZE;
 		}
 
 		A_Poly_Vert operator[]( int i ) {
-			return A_Poly_Vert( smesh,  poly.verts[i] );
+			check_idx(i);
+			return A_Poly_Vert( smesh, poly.verts, i );
 		}
 
 		CA_Poly_Vert operator[]( int i ) const {
-			return CA_Poly_Vert( smesh,  poly.verts[i] );
+			check_idx(i);
+			return CA_Poly_Vert( smesh, poly.verts, i );
 		}
 
 		I_Poly_Vert begin() {
-			return I_Poly_Vert( smesh, &poly.verts[0],  &poly.verts[0],  &poly.verts[3] );
+			return I_Poly_Vert( smesh, poly.verts, 0 );
 		}
 
 		I_Poly_Vert end() {
-			return I_Poly_Vert( smesh, &poly.verts[3],  &poly.verts[0],  &poly.verts[3] );
+			return I_Poly_Vert( smesh, poly.verts, POLY_SIZE );
 		}
 
 	private:
-		A_Poly_Verts( Smesh& a_smesh,  Poly& a_poly )  :  smesh( a_smesh ),  poly( a_poly )  {}
-		Smesh&  smesh;
-		Poly&  poly;
+		inline void check_idx(int i) {
+			DCHECK_GE(i, 0) << "A_Poly_Verts::operator[]: index out of range";
+			DCHECK_LT(i, POLY_SIZE) << "A_Poly_Verts::operator[]: index out of range";
+		}
+
+	private:
+		A_Poly_Verts( Smesh& s, Poly& p ) : smesh(s), poly(p) {}
+		Smesh& smesh;
+		Poly& poly;
 
 		friend Smesh;
 	};
@@ -669,16 +792,40 @@ public:
 
 		Poly_Vert_Props& props;
 
+		A_Poly_Vert prev() const {
+			int n = POLY_SIZE;//verts.size();
+			int new_pv_idx = (pv_idx + n - 1) % n;
+			return A_Poly_Vert(smesh, verts, new_pv_idx);
+		}
+
+		A_Poly_Vert next() const {
+			int n = POLY_SIZE;//verts.size();
+			int new_pv_idx = (pv_idx + 1) % n;
+			return A_Poly_Vert(smesh, verts, new_pv_idx);
+		}
+
+
 	private:
-		A_Poly_Vert( Smesh& a_smesh,  Poly_Vert&  a_poly_vert ) :
-			pos( a_smesh.raw_verts[ a_poly_vert.idx ].pos ),
-			vert( a_smesh, a_smesh.raw_verts[ a_poly_vert.idx ] ),
-			props( a_poly_vert ),
-			smesh( a_smesh ),
-			poly_vert( a_poly_vert ) {}
+		inline void check_idx(int i) {
+			DCHECK_GE(i, 0) << "A_Poly_Verts::operator[]: index out of range";
+			DCHECK_LT(i, POLY_SIZE) << "A_Poly_Verts::operator[]: index out of range";
+		}
+
+		A_Poly_Vert( Smesh& m, Poly_Vert vs[], int i ) :
+				pos( m.raw_verts[ vs[i].idx ].pos ),
+				vert( m, m.raw_verts[ vs[i].idx ] ),
+				props( vs[i] ),
+				smesh(m),
+				verts(vs),
+				pv_idx( i ) {
+
+			check_idx(i);
+		}
 
 		Smesh& smesh;
-		Poly_Vert& poly_vert;
+
+		Poly_Vert* verts;
+		const int pv_idx;
 
 		friend Smesh;
 	};
@@ -694,16 +841,31 @@ public:
 
 		const Poly_Vert_Props& props;
 
+		CA_Poly_Vert prev() const {
+			int n = verts.size();
+			int new_pv_idx = (pv_idx + n - 1) % n;
+			return CA_Poly_Vert(smesh, verts, new_pv_idx);
+		}
+
+		CA_Poly_Vert next() const {
+			int n = verts.size();
+			int new_pv_idx = (pv_idx + 1) % n;
+			return CA_Poly_Vert(smesh, verts, new_pv_idx);
+		}
+
 	private:
-		CA_Poly_Vert( const Smesh& a_smesh, const Poly_Vert& a_poly_vert ) :
-			pos( a_smesh.raw_verts[ a_poly_vert.idx ].pos ),
-			vert( a_smesh, a_smesh.raw_verts[ a_poly_vert.idx ] ),
-			props( a_poly_vert ),
-			smesh( a_smesh ),
-			poly_vert( a_poly_vert ) {}
+		CA_Poly_Vert( const Smesh& m, const Poly_Vert vs[], int i ) :
+			pos( m.raw_verts[ vs[i].idx ].pos ),
+			vert( m, m.raw_verts[ vs[i].idx ] ),
+			props( vs[i] ),
+			smesh(m),
+			verts(vs),
+			pv_idx( i ) {}
 
 		const Smesh& smesh;
-		const Poly_Vert& poly_vert;
+
+		const Poly_Vert verts[];
+		const int pv_idx;
 
 		friend Smesh;
 	};
