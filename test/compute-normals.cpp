@@ -80,7 +80,7 @@ TEST(Test_compute_normals, compute_normals_cube) {
 
 TEST(Test_compute_normals, compute_normals_cube_external) {
 	
-	auto mesh = get_cube_mesh<Mesh>();
+	const auto mesh = get_cube_mesh<Mesh>();
 
 	std::vector<Eigen::Matrix<double,3,1>> normals(mesh.verts.size_including_deleted());
 

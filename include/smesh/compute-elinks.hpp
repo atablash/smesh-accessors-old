@@ -32,7 +32,7 @@ auto fast_compute_elinks(MESH& mesh) {
 	Fast_Compute_Elinks_Result result;
 
 	using namespace std;
-	unordered_map< pair<int,int>, typename MESH::H_Poly_Edge > open_edges;
+	unordered_multimap< pair<int,int>, typename MESH::H_Poly_Edge > open_edges;
 
 	for(auto p : mesh.polys) {
 		for(auto pe : p.edges) {

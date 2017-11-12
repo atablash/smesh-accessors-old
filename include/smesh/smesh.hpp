@@ -130,22 +130,20 @@ public:
 
 
 	class  A_Vert;
-	class CA_Vert;
-	using  I_Vert =   Index_Iterator< A_Vert, std::vector<Vert>>;
-	using CI_Vert =   Index_Iterator<CA_Vert, std::vector<Vert>>;
+	using  I_Vert =   Index_Iterator<      A_Vert, std::vector<Vert>>;
+	using CI_Vert =   Index_Iterator<const A_Vert, std::vector<Vert>>;
 
 
 	class  A_Poly;
-	class CA_Poly;
-	using  I_Poly =   Index_Iterator< A_Poly, std::vector<Poly>>;
-	using CI_Poly =   Index_Iterator<CA_Poly, std::vector<Poly>>;
+	using  I_Poly =   Index_Iterator<      A_Poly, std::vector<Poly>>;
+	using CI_Poly =   Index_Iterator<const A_Poly, std::vector<Poly>>;
 
 
 
 	class  A_Poly_Verts;
 
 	class  A_Poly_Vert;
-	class CA_Poly_Vert;
+	//class CA_Poly_Vert;
 
 	template<class A>
 	struct Get_A_Double_Idx {
@@ -163,10 +161,10 @@ public:
 	};
 
 	// extra is Smesh& and int (poly index)
-	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
+	using  I_Poly_Vert = Index_Iterator<      A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
 		std::pair<Smesh&,int>, Get_A_Double_Idx<A_Poly_Vert>>;
 
-	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
+	using CI_Poly_Vert = Index_Iterator<const A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>,
 		std::pair<Smesh&,int>, Get_A_Double_Idx<A_Poly_Vert>>;
 
 
@@ -563,10 +561,12 @@ public:
 			return A_Vert{smesh, idx};
 		}
 
+		/*
 		CA_Vert operator[](int idx) const {
 			check_idx(idx);
 			return CA_Vert{smesh, idx};
 		}
+		*/
 
 
 		// iterator
@@ -701,32 +701,6 @@ public:
 	};
 
 
-	class CA_Vert {
-	public:
-
-		const Pos& pos;
-		const Vert_Props& props;
-
-		int idx;
-
-	// store environment:
-	private:
-		CA_Vert( const Smesh& a_smesh, const Vert& a_vert)  :
-				pos(    a_vert.pos ),
-				props(  a_vert ),
-				idx(    &a_vert - &a_smesh.raw_verts[0] ),
-				vert(   a_vert ) {
-
-			DCHECK(!vert.del) << "vertex is already deleted";
-		}
-		
-		//Smesh& smesh;
-		const Vert& vert;
-		
-		friend Smesh;
-	};
-
-
 	
 
 
@@ -777,29 +751,6 @@ public:
 	};
 
 
-	class CA_Poly {
-	public:
-
-		Poly_Props& props;
-
-		A_Poly_Verts verts;
-		A_Poly_Edges edges;
-
-
-	private:
-		CA_Poly( const Smesh& m, const Poly& p )  :
-				props(p),
-				verts(m, p),
-				edges(m, p),
-				poly(p) {
-
-			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
-				DCHECK( !poly.del ) << "polygon is deleted";
-		}
-		const Poly& poly;
-
-		friend Smesh;
-	};
 
 
 
@@ -821,11 +772,6 @@ public:
 		A_Poly_Vert operator[]( int i ) {
 			check_idx(i);
 			return A_Poly_Vert( smesh, poly, i );
-		}
-
-		CA_Poly_Vert operator[]( int i ) const {
-			check_idx(i);
-			return CA_Poly_Vert( smesh, poly, i );
 		}
 
 		I_Poly_Vert begin() {
@@ -946,46 +892,6 @@ public:
 
 		const int poly;
 		const int poly_vert;
-
-		friend Smesh;
-	};
-
-
-
-
-	class CA_Poly_Vert {
-	public:
-		const Pos& pos;
-
-		CA_Vert vert;
-
-		const Poly_Vert_Props& props;
-
-		CA_Poly_Vert prev() const {
-			int n = verts.size();
-			int new_pv_idx = (pv_idx + n - 1) % n;
-			return CA_Poly_Vert(smesh, verts, new_pv_idx);
-		}
-
-		CA_Poly_Vert next() const {
-			int n = verts.size();
-			int new_pv_idx = (pv_idx + 1) % n;
-			return CA_Poly_Vert(smesh, verts, new_pv_idx);
-		}
-
-	private:
-		CA_Poly_Vert( const Smesh& m, const std::array<Poly_Vert,POLY_SIZE>& vs, int i ) :
-			pos( m.raw_verts[ vs[i].idx ].pos ),
-			vert( m, m.raw_verts[ vs[i].idx ] ),
-			props( vs[i] ),
-			smesh(m),
-			verts(vs),
-			pv_idx( i ) {}
-
-		const Smesh& smesh;
-
-		const std::array<Poly_Vert, POLY_SIZE>& verts;
-		const int pv_idx;
 
 		friend Smesh;
 	};
