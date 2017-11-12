@@ -143,7 +143,7 @@ private:
 	};
 	
 	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)> {
-		Poly_Vert verts[POLY_SIZE];
+		std::array<Poly_Vert, POLY_SIZE> verts;
 	};
 	
 	
@@ -344,7 +344,7 @@ private:
 
 
 private:
-	template<class A, class CONTAINER_REF, class EXTRA = Smesh&, class GET_A = A>
+	template<class A, class CONTAINER, class EXTRA = Smesh&, class GET_A = A>
 	class Index_Iterator {
 	public:
 		Index_Iterator& operator++() {
@@ -375,32 +375,31 @@ private:
 
 
 		template<class AA, class EE, class GG>
-		bool operator==(const Index_Iterator<AA,CONTAINER_REF,EE,GG>& o) const {
+		bool operator==(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
 			return idx == o.idx;
 		}
 
 		template<class AA, class EE, class GG>
-		bool operator!=(const Index_Iterator<AA,CONTAINER_REF,EE,GG>& o) const {
+		bool operator!=(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
 			return ! (*this == o);
 		}
 
 
 		const A operator*() const {
-			std::cout << "asd " << idx << " " << container[idx].idx << " " << container << std::endl;
-			return GET_A(extra, container, idx); }
+			// const cast to avoid defining a separate const_iterator
+			return GET_A(extra, const_cast<CONTAINER&>(container), idx);
+		}
 
 
 	private:
-		Index_Iterator(const EXTRA& ex, const CONTAINER_REF co, int i) :
+		Index_Iterator(const EXTRA& ex, const CONTAINER& co, int i) :
 				extra(ex), container(co), idx(i) {
-			std::cout << "dupa0 " << 0 << " " << co[0].idx << " " << co << std::endl;
-			std::cout << "dupa3 " << 3 << " " << co[3].idx << " " << co << std::endl;
 			DCHECK_GE(i, 0) << "iterator constructor: index out of range";
 		}
 
 	private:
 		EXTRA extra;
-		const CONTAINER_REF container;
+		const CONTAINER& container;
 		int idx;
 
 		friend Smesh;
@@ -438,8 +437,8 @@ public:
 
 	class  A_Poly_Vert;
 	class CA_Poly_Vert;
-	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, Poly_Vert*>;
-	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, Poly_Vert*>;
+	using  I_Poly_Vert = Index_Iterator< A_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>>;
+	using CI_Poly_Vert = Index_Iterator<CA_Poly_Vert, std::array<Poly_Vert, POLY_SIZE>>;
 
 
 
@@ -477,7 +476,11 @@ public:
 			return smesh.raw_verts.size();
 		}
 
-		// todo: implement size() - take deleted verts into account!
+		int size() const {
+			if constexpr(!bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)) return smesh.raw_verts.size();
+
+			throw "not implemented";
+		}
 
 
 		inline void check_idx(int idx) {
@@ -811,7 +814,7 @@ public:
 			DCHECK_LT(i, POLY_SIZE) << "A_Poly_Verts::operator[]: index out of range";
 		}
 
-		A_Poly_Vert( Smesh& m, Poly_Vert vs[], int i ) :
+		A_Poly_Vert( Smesh& m, std::array<Poly_Vert, POLY_SIZE>& vs, int i ) :
 				pos( m.raw_verts[ vs[i].idx ].pos ),
 				vert( m, m.raw_verts[ vs[i].idx ] ),
 				props( vs[i] ),
@@ -824,7 +827,7 @@ public:
 
 		Smesh& smesh;
 
-		Poly_Vert* verts;
+		std::array<Poly_Vert, POLY_SIZE>& verts;
 		const int pv_idx;
 
 		friend Smesh;
@@ -854,7 +857,7 @@ public:
 		}
 
 	private:
-		CA_Poly_Vert( const Smesh& m, const Poly_Vert vs[], int i ) :
+		CA_Poly_Vert( const Smesh& m, const std::array<Poly_Vert,POLY_SIZE>& vs, int i ) :
 			pos( m.raw_verts[ vs[i].idx ].pos ),
 			vert( m, m.raw_verts[ vs[i].idx ] ),
 			props( vs[i] ),
@@ -864,7 +867,7 @@ public:
 
 		const Smesh& smesh;
 
-		const Poly_Vert verts[];
+		const std::array<Poly_Vert, POLY_SIZE>& verts;
 		const int pv_idx;
 
 		friend Smesh;

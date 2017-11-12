@@ -111,6 +111,42 @@ TEST(Test_compute_normals, compute_normals_cube) {
 
 
 
+
+
+
+TEST(Test_compute_normals, compute_normals_cube_external) {
+	
+	auto mesh = get_cube_mesh< Smesh<double, Smesh_Flags::NONE> >();
+
+	std::vector<Eigen::Matrix<double,3,1>> normals(mesh.verts.size_including_deleted());
+
+	compute_normals(mesh, [&normals](int i) -> auto& { return normals[i]; });
+
+	auto s = 1.0 / sqrt(3);
+
+	for(int x=0; x<2; ++x) {
+		for(int y=0; y<2; ++y) {
+			for(int z=0; z<2; ++z) {
+				int idx = x*4 + y*2 + z;
+
+				if(x == 0) EXPECT_DOUBLE_EQ(-s, normals[idx][0]);
+				else EXPECT_DOUBLE_EQ(s, normals[idx][0]);
+
+				if(y == 0) EXPECT_DOUBLE_EQ(-s, normals[idx][1]);
+				else EXPECT_DOUBLE_EQ(s, normals[idx][1]);
+
+				if(z == 0) EXPECT_DOUBLE_EQ(-s, normals[idx][2]);
+				else EXPECT_DOUBLE_EQ(s, normals[idx][2]);
+			}
+		}
+	}
+}
+
+
+
+
+
+
 struct Init {
 	Init(){
 		google::InstallFailureSignalHandler();

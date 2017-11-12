@@ -1,0 +1,34 @@
+dist: trusty
+sudo: required
+
+language: cpp
+compiler: g++
+
+addons:
+  apt:
+    sources:
+      # C++17
+      - ubuntu-toolchain-r-test
+    packages:
+      # C++17
+      - g++-7
+      # dependencies
+      - libgoogle-glog-dev
+      - libgtest-dev
+      - libeigen3-dev
+      
+before_install:
+  - export CC=gcc-7
+  - export CXX=g++-7
+
+install:
+  - travis/fix-gtest.sh
+
+script:
+  # build
+  - cmake -DSMESH_BUILD_TESTS=ON .
+  - make
+  - ctest --verbose
+
+notifications:
+  email: false
