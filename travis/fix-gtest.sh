@@ -3,5 +3,5 @@ mkdir /tmp/.build
 cd /tmp/.build
 cmake -DCMAKE_BUILD_TYPE=RELEASE /usr/src/gtest/
 make
-mv libg* /usr/lib/
+sudo mv libg* /usr/lib/
 rm -rf /tmp/.build

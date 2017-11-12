@@ -1,5 +1,5 @@
 dist: trusty
-sudo: false
+sudo: required # for building gtest
 
 language: cpp
 compiler: g++
