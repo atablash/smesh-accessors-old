@@ -6,6 +6,7 @@ find_package(Threads REQUIRED)
 
 
 set(sources
+	gtest-init.cpp
 	compute-normals.cpp
 	elinks.cpp
 )
@@ -32,6 +33,8 @@ target_link_libraries( all-tests
 	${GTEST_LIBRARIES}
 	${GTEST_MAIN_LIBRARIES}
 )
+
+# cotire(all-tests)
 
 add_test( all-tests all-tests )
 

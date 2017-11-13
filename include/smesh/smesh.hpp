@@ -243,7 +243,10 @@ private:
 //
 private:
 	std::vector<Vert> raw_verts;
+	int raw_verts_deleted = 0;
+
 	std::vector<Poly> raw_polys;
+	int raw_polys_deleted = 0;
 
 
 //
@@ -384,7 +387,7 @@ public:
 		int size() const {
 			if constexpr(!bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)) return smesh.raw_verts.size();
 
-			throw "not implemented";
+			return smesh.raw_verts.size() - smesh.raw_verts_deleted;
 		}
 
 
@@ -460,7 +463,14 @@ public:
 			return smesh.raw_polys.size();
 		}
 
-		// TODO: account for deleted - implement size()
+		int size() const {
+
+			if constexpr(!bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)) {
+				return smesh.raw_polys.size();
+			}
+
+			return smesh.raw_polys.size() - smesh.raw_polys_deleted;
+		}
 		
 		A_Poly operator[]( int idx ) {
 			DCHECK(0 <= idx && idx < (int)smesh.raw_polys.size()) << "polygon index out of range";
@@ -519,6 +529,7 @@ public:
 		void remove() {
 			DCHECK( !smesh.raw_verts[idx].del );
 			smesh.raw_verts[idx].del = true;
+			++smesh.raw_verts_deleted;
 		}
 
 	// store environment:
@@ -591,6 +602,7 @@ public:
 		void remove() {
 			DCHECK( !smesh.raw_polys[poly].del );
 			smesh.raw_polys[poly].del = true;
+			++smesh.raw_polys_deleted;
 		}
 
 		A_Poly_Verts verts;

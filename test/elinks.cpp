@@ -3,8 +3,6 @@
 
 #include <gtest/gtest.h>
 
-//#include <smesh/io.hpp>
-
 #include "common.hpp"
 
 using namespace smesh;
@@ -30,15 +28,4 @@ TEST(Test_elinks, fast_compute_elinks_cube) {
 
 
 
-
-
-
-
-
-
-struct init_sdfgsdfg {
-	init_sdfgsdfg(){
-		google::InstallFailureSignalHandler();
-	}
-} init_sdfgsdfg;
 

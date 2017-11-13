@@ -110,10 +110,3 @@ TEST(Test_compute_normals, compute_normals_cube_external) {
 
 
 
-
-struct Init {
-	Init(){
-		google::InstallFailureSignalHandler();
-	}
-} init;
-
