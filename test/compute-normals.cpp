@@ -19,7 +19,7 @@ struct Smesh_Options_vnormal : Smesh_Options {
 	V_Props_normal Vert_Props();
 };
 
-using Mesh = Smesh<double, Smesh_Flags::NONE, Smesh_Options_vnormal>;
+using Mesh = Smesh<double, Smesh_Options_vnormal, Smesh_Flags::NONE>;
 
 TEST(Test_fast_compute_normals, fast_compute_normals_cube) {
 

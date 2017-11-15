@@ -8,7 +8,7 @@ find_package(Threads REQUIRED)
 set(sources
 	gtest-init.cpp
 	compute-normals.cpp
-	elinks.cpp
+	links.cpp
 )
 
 if (SMESH_WITH_TINYPLY)

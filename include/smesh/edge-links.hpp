@@ -2,7 +2,72 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+//
+// check if edge links are valid and 2-way
+//
+template< class MESH >
+bool has_valid_edge_links( const MESH& mesh ) {
+
+	for( auto p : mesh.polys ) {
+		for( auto pe : p.edges ) {
+			if( !pe.has_link() ) continue;
+
+			if( !pe.link().has_link() ) return false;
+
+			if( pe.link().link() != pe ) return false;
+		}
+	}
+
+	return true;
+}
+
+
+//
+// check if all edges have links
+// (assumes links are valid)
+//
+template< class MESH >
+bool has_all_edge_links( const MESH& mesh ) {
+
+	for( auto p : mesh.polys ) {
+		for( auto pe : p.edges ) {
+			if( !pe.has_link() ) return false;
+		}
+	}
+
+	return true;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
 // hash pairs:
+//
 
 namespace ab {
 	template<class T>inline T cycle_bits_left(T x,int i){return (x<<i) ^ (x>>(sizeof(T)*8-i));} // cycle bits left
