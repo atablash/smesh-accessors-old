@@ -70,10 +70,10 @@ The result is a mesh with additional normals as vertex properties.
 A combination of bit flags:
 
 * `NONE = 0` representing no flags
-* `VERTS_LAZY_DEL` - turns on vertices lazy removal
-* `POLYS_LAZY_DEL` - turns on polygons lazy removal
-* `EDGE_LINKS` - turns on *edge links*
-* `VERT_POLY_LINKS` - turns on *vertex-polygon* links (or *vertex-(polygon-vertex)* to be precise)
+* `VERTS_LAZY_DEL` (default: on) - turns on vertices lazy removal
+* `POLYS_LAZY_DEL` (default: on) - turns on polygons lazy removal
+* `EDGE_LINKS` (default: on) - turns on *edge links*
+* `VERT_POLY_LINKS` (default: on) - turns on *vertex-polygon* links (or *vertex-(polygon-vertex)* to be precise)
 
 Flags are defined using `enum class` with overloaded operator `|` and `&`. Conversion to *bool* requires implicit cast.
 
