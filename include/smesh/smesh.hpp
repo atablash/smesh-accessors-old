@@ -178,7 +178,7 @@ struct g_H_Poly_Edge {
 // - lazy removal of vertices or polygons (see bool del flag). TODO: remap support when no lazy removal
 //
 template <
-	class POS_FLOAT,
+	class SCALAR,
 	class OPTIONS = Smesh_Options,
 	Smesh_Flags FLAGS =
 		Smesh_Flags::VERTS_LAZY_DEL |
@@ -189,8 +189,8 @@ template <
 class Smesh {
 
 public:
-	using Pos_Float = POS_FLOAT;
-	using Pos = Eigen::Matrix<Pos_Float,3,1>;
+	using Scalar = SCALAR;
+	using Pos = Eigen::Matrix<Scalar,3,1>;
 	using Idx = int32_t; // vertex index type
 
 	using Vert_Props = decltype(OPTIONS().Vert_Props());
@@ -471,7 +471,7 @@ public:
 			return A_Vert<Const_Flag::FALSE> {smesh, smesh.raw_verts.back()};
 		}
 		
-		A_Vert<Const_Flag::FALSE> add(const Pos_Float& x, const Pos_Float& y, const Pos_Float& z) {
+		A_Vert<Const_Flag::FALSE> add(const Scalar& x, const Scalar& y, const Scalar& z) {
 			smesh.raw_verts.emplace_back(Pos{x,y,z});
 			return A_Vert<Const_Flag::FALSE> (smesh, smesh.raw_verts.size()-1);
 		}
@@ -993,7 +993,7 @@ public:
 
 		const std::array<const A_Vert<C>, 2> verts;
 
-		const Segment<typename Mesh::Pos_Float, 3> segment;
+		const Segment<typename Mesh::Scalar, 3> segment;
 
 
 	private:

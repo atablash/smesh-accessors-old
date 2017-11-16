@@ -77,6 +77,15 @@ A combination of bit flags:
 
 Flags are defined using `enum class` with overloaded operator `|` and `&`. Conversion to *bool* requires implicit cast.
 
+## Special properties
+
+Some properties have special meaning, e.g.:
+
+* For vertices
+	* `normal` - 3D vector representing vertex normal
+
+Although these properties have special meaning, most functions can be configured to use different property names, or even external arrays (see e.g. `test/compute-normals.cpp`, look for *external* keyword).
+
 ## Edge links
 
 Each polygon contains its edges (or, *half-edges*), and each *polygon-edge* can be linked to adjacent polygon's edge.
@@ -132,11 +141,11 @@ To get back an accessor from handle, you need the parent mesh object:
 
 # Accessor const-ness
 
-Accessors are immutable. If you want a mutable reference to some entity, you have to use handles instead.
-
-Because accessor objects are immutable, they are const.
+Accessor objects are immutable. If you want to store accessor in an assignable variable, use handles instead.
 
 Accessors usually come in 2 variants: `Accessor_Type<Const_Flag::TRUE>` and `Accessor_Type<Const_Flag::FALSE`. The first one points to a const entity, while the second one can modify the entity that it points to.
+
+One exception is `mesh.verts` and `mesh.polys` accessors. In order to have them as `Smesh` member variables rather than functions, pointed-to object const-ness is decided to be the same as accessor object const-ness.
 
 # Tests
 

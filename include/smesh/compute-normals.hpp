@@ -72,7 +72,7 @@ template< class MESH, class GET_V_NORMAL >
 void compute_vert_normals( MESH& mesh,
 		const GET_V_NORMAL& get_v_normal ) {
 
-	std::vector<typename MESH::Pos_Float> weights(mesh.verts.size_including_deleted());
+	std::vector<typename MESH::Scalar> weights(mesh.verts.size_including_deleted());
 
 	for(auto v : mesh.verts) {
 		get_v_normal(v.idx) = {0,0,0};
