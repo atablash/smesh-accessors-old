@@ -2,13 +2,13 @@
 
 # Why?
 
-* Easy to use modern C++ 3D mesh interface
+* Easy to use modern C++ interface
 * Algorithms separated from mesh structure using templates
 * Optimized for speed
 
 # Using the library
 
-# Accessors
+## Accessors
 
 Accessors, or views, are objects that provide simple interface for underlying raw structures.
 
@@ -25,23 +25,71 @@ One exception is the `mesh` object itself - **it is returned by reference**, not
 
 	auto& mesh = vertex.mesh;
 
-# Eigen
+## Construction
 
-Google's `Eigen` library is used for storing vertex positions and other vectors.
+The `Smesh` class has following template parameters:
 
-# Edge links
+	Smesh<SCALAR, OPTIONS = Mesh_Options, FLAGS = ...>
+
+### `SCALAR`
+
+What scalar type to use for vertex positions. E.g. `double`.
+
+### `OPTIONS`
+
+A structure that encodes some of the types used in `Smesh`.
+
+Default types are encoded as follows:
+
+	struct Smesh_Options {
+		Void Vert_Props();
+		Void Poly_Props();
+		Void Poly_Vert_Props();
+	};
+
+Meaning that `Vert_Props` is `Void` (empty struct), and so on.
+
+**TODO:** Implement `Indexed_Vert_Props` - vertex properties that are owned by *vertices* and assigned to one or more *polygon-vertices*. The idea is to have usual vertex properties blending during e.g. edge collapsing, while allowing several classes of polygons, with e.g. different textures/materials that don't interfere with each other.
+
+To override some of the default types, derive from `Smesh_Options`:
+
+	struct V_Props_normal {
+		Eigen::Matrix<double,3,1> normal;
+	};
+
+	struct Smesh_Options_vnormal : Smesh_Options {
+		V_Props_normal Vert_Props();
+	};
+
+	Smesh<double, Smesh_Options_vnormal> mesh;
+
+The result is a mesh with additional normals as vertex properties.
+
+### `FLAGS`
+
+A combination of bit flags:
+
+* `NONE = 0` representing no flags
+* `VERTS_LAZY_DEL` - turns on vertices lazy removal
+* `POLYS_LAZY_DEL` - turns on polygons lazy removal
+* `EDGE_LINKS` - turns on *edge links*
+* `VERT_POLY_LINKS` - turns on *vertex-polygon* links (or *vertex-(polygon-vertex)* to be precise)
+
+Flags are defined using `enum class` with overloaded operator `|` and `&`. Conversion to *bool* requires implicit cast.
+
+## Edge links
 
 Each polygon contains its edges (or, *half-edges*), and each *polygon-edge* can be linked to adjacent polygon's edge.
 
 Enabled using `Mesh_Flags::EDGE_LINKS`.
 
-# Vertex->Polygon links
+## Vertex->Polygon links
 
 Each vertex can optionally link polygons (or, to be precise, *polygon-vertices*) that reference it.
 
 Enabled using `Mesh_Flags::VERT_POLY_LINKS`.
 
-# Lazy removal
+## Lazy removal
 
 Several entities can be lazy removed, including:
 
@@ -54,9 +102,11 @@ Lazy deleted objects still account for time needed to iterate over all objects, 
 
 When arrays are compacted, indices are changed and both handles and accessors are invalidated, so compaction requests have to be manually made by user.
 
+To enable lazy removal, use `Mesh_Flags::VERTS_LAZY_DEL` and/or `Mesh_Flags::POLYS_LAZY_DEL`.
+
 **TODO: implement compaction**
 
-# Mesh entities
+## Mesh entities
 
 Some terminology of things that meshes consist of:
 
@@ -78,7 +128,7 @@ To get a handle:
 
 To get back an accessor from handle, you need the parent mesh object:
 
-	auto polygon_edge = polygon_edge_handle(mesh)
+	auto polygon_edge = polygon_edge_handle(mesh);
 
 # Accessor const-ness
 
@@ -91,4 +141,9 @@ Accessors usually come in 2 variants: `Accessor_Type<Const_Flag::TRUE>` and `Acc
 # Tests
 
 There are some unit tests in `test` directory. Use them as a reference.
+
+
+# Eigen
+
+Google's `Eigen` library is used for storing vertex positions and other vectors.
 
