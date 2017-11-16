@@ -21,11 +21,11 @@ struct Smesh_Options_vnormal : Smesh_Options {
 
 using Mesh = Smesh<double, Smesh_Options_vnormal, Smesh_Flags::NONE>;
 
-TEST(Test_fast_compute_normals, fast_compute_normals_cube) {
+TEST(Fast_compute_vert_normals, cube) {
 
 	auto mesh = get_cube_mesh<Mesh>();
 
-	fast_compute_normals(mesh);
+	fast_compute_vert_normals(mesh);
 
 	for(int x=0; x<2; ++x) {
 		for(int y=0; y<2; ++y) {
@@ -47,11 +47,11 @@ TEST(Test_fast_compute_normals, fast_compute_normals_cube) {
 
 
 
-TEST(Test_compute_normals, compute_normals_cube) {
+TEST(Compute_vert_normals, cube) {
 	
 	auto mesh = get_cube_mesh<Mesh>();
 
-	compute_normals(mesh);
+	compute_vert_normals(mesh);
 
 	auto s = 1.0 / sqrt(3);
 
@@ -78,13 +78,13 @@ TEST(Test_compute_normals, compute_normals_cube) {
 
 
 
-TEST(Test_compute_normals, compute_normals_cube_external) {
+TEST(Compute_vert_normals, cube_external) {
 	
 	const auto mesh = get_cube_mesh<Mesh>();
 
 	std::vector<Eigen::Matrix<double,3,1>> normals(mesh.verts.size_including_deleted());
 
-	compute_normals(mesh, [&normals](int i) -> auto& { return normals[i]; });
+	compute_vert_normals(mesh, [&normals](int i) -> auto& { return normals[i]; });
 
 	auto s = 1.0 / sqrt(3);
 

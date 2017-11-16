@@ -21,9 +21,9 @@ bool has_valid_edge_links( const MESH& mesh ) {
 
 	for( auto p : mesh.polys ) {
 		for( auto pe : p.edges ) {
-			if( !pe.has_link() ) continue;
+			if( !pe.has_link ) continue;
 
-			if( !pe.link().has_link() ) return false;
+			if( !pe.link().has_link ) return false;
 
 			if( pe.link().link() != pe ) return false;
 		}
@@ -42,7 +42,7 @@ bool has_all_edge_links( const MESH& mesh ) {
 
 	for( auto p : mesh.polys ) {
 		for( auto pe : p.edges ) {
-			if( !pe.has_link() ) return false;
+			if( !pe.has_link ) return false;
 		}
 	}
 
@@ -86,15 +86,15 @@ namespace std {
 //
 // if one edge is shared among more than 2 polys, pairing order is undefined
 //
-struct Fast_Compute_Elinks_Result {
+struct Fast_Compute_Edge_Links_Result {
 	int num_matched_edges = 0;
 	int num_open_edges = 0;
 };
 
 template<class MESH>
-auto fast_compute_elinks(MESH& mesh) {
+auto fast_compute_edge_links(MESH& mesh) {
 
-	Fast_Compute_Elinks_Result result;
+	Fast_Compute_Edge_Links_Result result;
 
 	using namespace std;
 	unordered_multimap< pair<int,int>, typename MESH::H_Poly_Edge > open_edges;

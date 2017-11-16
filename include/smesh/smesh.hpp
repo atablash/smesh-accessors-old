@@ -6,6 +6,8 @@
 
 #include "common.hpp"
 
+#include "segment.hpp"
+
 //#include <atablash/member-detector.hpp>
 
 
@@ -104,6 +106,72 @@ struct Smesh_Options {
 
 
 
+
+
+
+
+
+//
+// handles
+// TODO: implement small handles
+//
+
+//
+// a handle to either polygon's vertex or edge (half-edge)
+//
+struct g_H_Poly_Vert{
+	int32_t poly = -1;
+	int8_t vert = -1; // 0, 1 or 2
+
+	bool operator==(const g_H_Poly_Vert& o) const {
+		return poly == o.poly && vert == o.vert;
+	}
+
+	bool operator!=(const g_H_Poly_Vert& o) const {
+		return !(*this == o);
+	}
+};
+
+
+struct g_H_Poly_Edge {
+	int32_t poly = -1;
+	int8_t edge = -1; // 0, 1 or 2
+
+
+	template<class MESH>
+	auto operator()(MESH& mesh) const {
+		return typename MESH::VA_Poly_Edge (mesh, poly, edge);
+	}
+
+	template<class MESH>
+	auto operator()(const MESH& mesh) const {
+		return typename MESH::CA_Poly_Edge (mesh, poly, edge);
+	}
+
+
+	template<class MESH>
+	auto get(MESH& mesh) const {
+		return (*this)(mesh);
+	}
+
+	template<class MESH>
+	auto get(const MESH& mesh) const {
+		return (*this)(mesh);
+	}
+
+
+	bool operator==(const g_H_Poly_Edge& o) const {
+		return poly == o.poly && edge == o.edge;
+	}
+
+	bool operator!=(const g_H_Poly_Edge& o) const {
+		return !(*this == o);
+	}
+};
+
+
+
+
 //
 // a triangle mesh structure with edge links (half-edges)
 //
@@ -153,6 +221,9 @@ private:
 	template<class A, class CONTAINER, class EXTRA = Smesh&, class GET_A = A>
 	class Index_Iterator;
 
+public:
+	using H_Poly_Vert = g_H_Poly_Vert;
+	using H_Poly_Edge = g_H_Poly_Edge;
 
 public:
 	class A_Verts;
@@ -165,11 +236,6 @@ public:
 
 	template<Const_Flag> class A_Poly;
 	template<Const_Flag C> using I_Poly = Index_Iterator< A_Poly<C>, std::vector<Poly>>;
-
-
-
-	struct H_Poly_Vert;
-	struct H_Poly_Edge;
 
 
 	template<Const_Flag> class A_Poly_Verts;
@@ -202,6 +268,8 @@ public:
 
 	template<Const_Flag> class A_Poly_Edges;
 	template<Const_Flag> class A_Poly_Edge;
+	using VA_Poly_Edge = A_Poly_Edge<Const_Flag::FALSE>;
+	using CA_Poly_Edge = A_Poly_Edge<Const_Flag::TRUE>;
 
 
 	template<Const_Flag C>
@@ -237,52 +305,6 @@ public:
 		std::pair<Smesh&,int>,
 		A_Poly_Vert_From_Poly_Link_Iter<C> >;
 
-
-
-
-
-	//
-	// handles
-	// TODO: implement small handles
-	//
-public:
-	//
-	// a handle to either polygon's vertex or edge (half-edge)
-	//
-	struct H_Poly_Vert{
-		int32_t poly = -1;
-		int8_t vert = -1; // 0, 1 or 2
-
-		bool operator==(const H_Poly_Vert& o) const {
-			return poly == o.poly && vert == o.vert;
-		}
-
-		bool operator!=(const H_Poly_Vert& o) const {
-			return !(*this == o);
-		}
-	};
-
-	struct H_Poly_Edge {
-		int32_t poly = -1;
-		int8_t edge = -1; // 0, 1 or 2
-
-
-		A_Poly_Edge<Const_Flag::FALSE> get(Smesh& smesh) const {
-			return A_Poly_Edge<Const_Flag::FALSE> (smesh, poly, edge);
-		}
-
-		A_Poly_Edge<Const_Flag::TRUE> get(const Smesh& smesh) const {
-			return A_Poly_Edge<Const_Flag::TRUE> (smesh, poly, edge);
-		}
-
-		bool operator==(const H_Poly_Edge& o) const {
-			return poly == o.poly && edge == o.edge;
-		}
-
-		bool operator!=(const H_Poly_Edge& o) const {
-			return !(*this == o);
-		}
-	};
 
 
 
@@ -466,6 +488,10 @@ public:
 			if constexpr(!bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)) return smesh.raw_verts.size();
 
 			return smesh.raw_verts.size() - smesh.raw_verts_deleted;
+		}
+
+		bool empty() const {
+			return size() == 0;
 		}
 
 
@@ -909,16 +935,19 @@ public:
 	template<Const_Flag C>
 	class A_Poly_Edge { // or half-edge
 	public:
+
+		using Mesh = Smesh;
+
 		A_Poly_Edge link() const {
 			const auto& l = raw().edge_link;
-			DCHECK_GE(l.poly, 0); DCHECK_LT(l.poly, smesh.raw_polys.size());
+			DCHECK_GE(l.poly, 0); DCHECK_LT(l.poly, mesh.raw_polys.size());
 			DCHECK_GE(l.vert, 0); DCHECK_LT(l.vert, 3);
-			return A_Poly_Edge( smesh, l.poly, l.vert );
+			return A_Poly_Edge( mesh, l.poly, l.vert );
 		}
 
-		void link(A_Poly_Edge& other_poly_edge) const {
-			DCHECK(!has_link()) << "edge is already linked";
-			DCHECK(!other_poly_edge.has_link()) << "other edge is already linked";
+		void link(const A_Poly_Edge& other_poly_edge) const {
+			DCHECK(!has_link) << "edge is already linked";
+			DCHECK(!other_poly_edge.has_link) << "other edge is already linked";
 
 			// check if common vertices are shared
 			DCHECK_EQ(verts[0].idx, other_poly_edge.verts[1].idx);
@@ -929,15 +958,19 @@ public:
 			other_poly_edge.raw().edge_link = edge_to_vert(handle);
 		}
 
-		inline bool has_link() const {
-			return raw().edge_link.poly != -1;
+
+		A_Poly_Edge<C> prev() const {
+			const auto n = POLY_SIZE; //verts.size();
+			auto new_poly_edge = (handle.edge + n - 1) % n;
+			return A_Poly_Edge<C> (mesh, handle.poly, decltype(H_Poly_Edge::edge)(new_poly_edge));
 		}
 
-		const A_Poly<C> poly;
+		A_Poly_Edge<C> next() const {
+			const auto n = POLY_SIZE; //verts.size();
+			auto new_poly_edge = (handle.edge + 1) % n;
+			return A_Poly_Edge<C> (mesh, handle.poly, decltype(H_Poly_Edge::edge)(new_poly_edge));
+		}
 
-		const H_Poly_Edge handle;
-
-		const std::array<const A_Vert<C>, 2> verts;
 
 		// warning: comparing only handles!
 		// can't be used to compare objects from different meshes
@@ -949,26 +982,44 @@ public:
 			return !(*this == o);
 		}
 
+
+		Const<Smesh,C>& mesh;
+
+		const bool has_link;
+
+		const A_Poly<C> poly;
+
+		const H_Poly_Edge handle;
+
+		const std::array<const A_Vert<C>, 2> verts;
+
+		const Segment<typename Mesh::Pos_Float, 3> segment;
+
+
 	private:
 		auto& raw() const {
-			return smesh.raw_polys[handle.poly].verts[handle.edge];
+			return mesh.raw_polys[handle.poly].verts[handle.edge];
 		}
 
 		static inline H_Poly_Vert edge_to_vert(const H_Poly_Edge& x) {
 			return {x.poly, x.edge};
 		}
- 
+
 	private:
 		A_Poly_Edge( Const<Smesh,C>& m, const int p, const int8_t pv ) :
+			mesh(m),
+			has_link(m.raw_polys[p].verts[pv].edge_link.poly != -1),
 			poly( m, p ),
 			handle{p,pv},
 			verts({A_Vert<C>{m, m.raw_polys[p].verts[pv].idx},
 			       A_Vert<C>{m, m.raw_polys[p].verts[(pv+1)%POLY_SIZE].idx}}),
-			smesh( m ) {}
+			segment(
+				m.raw_verts[ m.raw_polys[p].verts[pv].idx ].pos,
+				m.raw_verts[ m.raw_polys[p].verts[(pv+1)%POLY_SIZE].idx ].pos) {}
 
-		Const<Smesh,C>& smesh;
 
 		friend Smesh;
+		friend g_H_Poly_Edge;
 	};
 
 
@@ -987,6 +1038,28 @@ public:
 
 
 
+inline std::ostream& operator<<(std::ostream& s, const g_H_Poly_Edge& pe) {
+	s << "(p:" << (int)pe.poly << "|e:" << (int)pe.edge << ")";
+	return s;
+}
+
+
+
+
+
 } // namespace smesh
 
+
+
+
+// HASH
+
+namespace std {
+template<>
+struct hash<const ::smesh::g_H_Poly_Edge> { // why const?! bug in libstdc++?
+	size_t operator()(const ::smesh::g_H_Poly_Edge& pe) const {
+		return (pe.poly << 2) ^ pe.edge;
+	}
+};
+}
 

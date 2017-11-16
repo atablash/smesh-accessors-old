@@ -5,6 +5,34 @@
 
 
 
+template<class V0, class V1>
+auto compute_angle(const V0& v0, const V1& v1) {
+	return acos(v0.dot(v1) / (v0.norm() * v1.norm()));
+}
+
+
+template<class POLY_VERT>
+auto compute_poly_vert_angle(const POLY_VERT& pv) {
+	auto v0 = pv.prev().pos - pv.pos;
+	auto v1 = pv.next().pos - pv.pos;
+	return compute_angle(v0, v1);
+}
+
+
+
+
+
+
+template<class POLY>
+auto compute_poly_normal(POLY p) {
+	auto v01 = p.verts[1].pos - p.verts[0].pos;
+	auto v02 = p.verts[2].pos - p.verts[0].pos;
+	auto normal = v01.cross(v02);
+	normal.normalize();
+	return normal;
+}
+
+
 
 
 
@@ -14,22 +42,38 @@
 
 
 //
-// check if mesh has isolated vertices
-// no vlinks information available
-// TODO: another version using vlinks. potentially faster
+// no test coverage
 //
 template< class MESH >
-bool has_isolated_vertices__novlinks( const MESH& mesh ) {
+std::vector<bool> compute_isolated_vertices( const MESH& mesh, bool use_vert_poly_links = false ) {
 
-	std::vector<bool> used(mesh.vs.size());
-
-	for( auto& poly : mesh.ps ) {
-		for( auto& poly_vert : poly.vs ) {
-			used[poly_vert.idx] = true;
-		}
+	if(use_vert_poly_links) {
+		throw "not implemented";
 	}
+	else {
+		std::vector<bool> isolated(mesh.verts.size_including_removed(), true);
 
-	for( auto& b : used ) if(!b) return true;
+		for( auto p : mesh.polys ) {
+			for( auto pv : p.verts ) {
+				isolated[pv.idx] = false;
+			}
+		}
+
+		return isolated;
+	}
+}
+
+
+//
+// no test coverage
+//
+template< class MESH >
+bool has_isolated_vertices( const MESH& mesh, bool use_vert_poly_links = false ) {
+	auto isolated = compute_isolated_vertices(mesh, use_vert_poly_links);
+
+	for(const auto& b : isolated) {
+		if(b) return true;
+	}
 
 	return false;
 }
@@ -39,58 +83,34 @@ bool has_isolated_vertices__novlinks( const MESH& mesh ) {
 
 
 
-//
-// remap references to vertex indices
-//
-template< class MESH, class VREMAP >
-void apply_vremap( MESH& mesh,  const VREMAP& vremap ) {
-
-	for( auto& poly : mesh.ps ) {
-		for( auto& poly_vert : poly.vs ) {
-			auto& idx = poly_vert.idx;
-			if( idx != vremap[idx] )  idx = vremap[idx]; // write only if value different (faster?)
-		}
-	}
-}
-
-
 
 
 
 
 //
-// * remap references to vertex indices
-// * shrink vertices vector
+// no test coverage
 //
-template< class MESH, class VREMAP >
-void apply_vremap_and_shrink( MESH& mesh,  const VREMAP& vremap ) {
-
-	apply_vremap( mesh,  vremap );
-
-	auto max_entry = std::max(vremap);
-	int new_num_vertices = max_entry + 1;
-
-	DCHECK_LE( new_num_vertices,  mesh.vs.size() ) << "vremap entry out of bounds: " << new_num_vertices;
-
-	mesh.vs.resize(new_num_vertices);
-}
-
-
-
-
-
-
-
-
-
 template< class MESH, class GET_V_NORMAL >
-void grow( MESH& mesh, double amount,
-		const GET_V_NORMAL& get_v_normal = [&mesh](int iv){ return mesh.vs(iv).props.normal; } ) {
+void grow( MESH& mesh, double amount, const GET_V_NORMAL& get_v_normal ) {
 	
 	for(auto& v : mesh.verts) {
 		v.pos += amount * get_v_normal(v.idx);
 	}
 }
+
+
+
+template< class MESH >
+void grow( MESH& mesh, double amount) {
+	grow(mesh, amount, [&mesh](int iv){ return mesh.verts[iv].props.normal; });
+}
+
+
+
+
+
+
+
 
 
 

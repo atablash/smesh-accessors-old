@@ -3,11 +3,11 @@
 
 
 
-#ifdef WITH_TINYPLY
-
 
 #include <tinyply.h>
+
 #include <fstream>
+#include <chrono>
 
 namespace smesh {
 
@@ -100,7 +100,7 @@ MESH load_ply(FILE_NAME&& file_name) {
 	// debug print
 	for (auto e : file.get_elements())
 	{
-		LOG(INFO) << "element - " << e.name << " (" << e.size << ")";
+		DLOG(INFO) << "element - " << e.name << " (" << e.size << ")";
 		for (auto p : e.properties)
 		{
 			DLOG(INFO) << "\tproperty - " << p.name << " (" << PropertyTable[p.propertyType].str << ")";
@@ -192,29 +192,6 @@ MESH load_ply(FILE_NAME&& file_name) {
 
 
 } // namespace smesh
-
-
-
-
-
-
-#else
-
-namespace smesh {
-
-template<class MESH>
-inline void save_ply(const MESH& mesh, std::string filename, bool binary = true) {
-	static_assert(false, "WITH_TINYPLY required");
-}
-
-
-} // namespace smesh
-
-
-#endif
-
-
-
 
 
 

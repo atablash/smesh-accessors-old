@@ -1,5 +1,7 @@
 #pragma once
 
+#include "mesh-utils.hpp"
+
 #include <vector>
 
 
@@ -10,7 +12,7 @@
 // compute_normals - fast version, no weighting
 //
 template< class MESH, class GET_V_NORMAL >
-void fast_compute_normals( MESH& mesh,
+void fast_compute_vert_normals( MESH& mesh,
 		const GET_V_NORMAL& get_v_normal ) {
 
 	std::vector<int> nums(mesh.verts.size_including_deleted());
@@ -42,8 +44,8 @@ void fast_compute_normals( MESH& mesh,
 
 
 template<class MESH>
-void fast_compute_normals( MESH& mesh ) {
-	fast_compute_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
+void fast_compute_vert_normals( MESH& mesh ) {
+	fast_compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
 }
 
 
@@ -61,19 +63,13 @@ void fast_compute_normals( MESH& mesh ) {
 
 
 
-template<class POLY_VERT>
-auto get_angle(const POLY_VERT& pv) {
-	auto v0 = pv.prev().pos - pv.pos;
-	auto v1 = pv.next().pos - pv.pos;
-	return acos(v0.dot(v1) / (v0.norm() * v1.norm()));
-}
 
 
 //
 // compute normals - slower version with weighting
 //
 template< class MESH, class GET_V_NORMAL >
-void compute_normals( MESH& mesh,
+void compute_vert_normals( MESH& mesh,
 		const GET_V_NORMAL& get_v_normal ) {
 
 	std::vector<typename MESH::Pos_Float> weights(mesh.verts.size_including_deleted());
@@ -83,13 +79,10 @@ void compute_normals( MESH& mesh,
 	}
 
 	for(auto p : mesh.polys) {
-		auto v01 = p.verts[1].pos - p.verts[0].pos;
-		auto v02 = p.verts[2].pos - p.verts[0].pos;
-		auto normal = v01.cross(v02);
-		normal.normalize();
+		auto normal = compute_poly_normal(p);
 
 		for(auto pv : p.verts) {
-			auto angle = get_angle(pv);
+			auto angle = compute_poly_vert_angle(pv);
 			get_v_normal(pv.vert.idx) += normal * angle;
 			weights[pv.vert.idx] += angle;
 		}
@@ -106,6 +99,6 @@ void compute_normals( MESH& mesh,
 
 
 template<class MESH>
-void compute_normals( MESH& mesh ) {
-	compute_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
+void compute_vert_normals( MESH& mesh ) {
+	compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
 }

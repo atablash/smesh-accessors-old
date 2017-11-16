@@ -9,6 +9,7 @@ set(sources
 	gtest-init.cpp
 	compute-normals.cpp
 	links.cpp
+	cap-holes.cpp
 )
 
 if (SMESH_WITH_TINYPLY)

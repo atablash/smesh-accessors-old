@@ -24,7 +24,7 @@ TEST(Edge_links, fast_compute_edge_links_cube) {
 
 	auto mesh = get_cube_mesh<Smesh<double, Smesh_Options, Smesh_Flags::EDGE_LINKS>>();
 
-	auto r = fast_compute_elinks(mesh);
+	auto r = fast_compute_edge_links(mesh);
 
 	EXPECT_EQ(18, r.num_matched_edges);
 	EXPECT_EQ(0, r.num_open_edges);
@@ -55,7 +55,7 @@ TEST(Links, compute_links_cube) {
 		Smesh_Flags::VERT_POLY_LINKS>>();
 
 	{
-		auto r = fast_compute_elinks(mesh);
+		auto r = fast_compute_edge_links(mesh);
 
 		EXPECT_EQ(18, r.num_matched_edges);
 		EXPECT_EQ(0, r.num_open_edges);
