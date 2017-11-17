@@ -10,11 +10,17 @@
 #include <map>
 
 
+struct Cap_Hole_Result {
+	int num_polys_created = 0;
+};
+
 //
 // for triangle meshes
 //
 template<class EDGE>
-void cap_hole(const EDGE edge) {
+Cap_Hole_Result cap_hole(const EDGE edge) {
+	Cap_Hole_Result r;
+
 	auto& m = edge.mesh;
 
 	std::list<decltype(edge.handle)> perimeter;
@@ -111,6 +117,8 @@ void cap_hole(const EDGE edge) {
 		// add cand, cand+1 poly
 		auto p = m.polys.add(i0, i1, i2);
 
+		++r.num_polys_created;
+
 		//LOG(INFO) << "add " << i0 << " " << i1 << " " << i2;
 
 		// create missing edge-links
@@ -161,19 +169,34 @@ void cap_hole(const EDGE edge) {
 
 		e0.get(m).link( e1.get(m) );
 	}
+
+	return r;
 }
 
 
 
+
+
+struct Cap_Holes_Result {
+	int num_holes_capped = 0;
+	int num_polys_created = 0;
+};
+
 template<class MESH>
-void cap_holes(MESH& mesh) {
+Cap_Holes_Result cap_holes(MESH& mesh) {
+	Cap_Holes_Result r;
+
 	for(auto p : mesh.polys) {
 		for(auto pe : p.edges) {
 			if(!pe.has_link) {
-				cap_hole(pe);
+				auto lr = cap_hole(pe);
+				++r.num_holes_capped;
+				r.num_polys_created += lr.num_polys_created;
 			}
 		}
 	}
+
+	return r;
 }
 
 
