@@ -19,5 +19,6 @@ struct Segment {
 // TODO: eigen memory alignment
 };
 
+
 } // namespace smesh
 

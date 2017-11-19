@@ -18,7 +18,7 @@ struct Cap_Hole_Result {
 // for triangle meshes
 //
 template<class EDGE>
-Cap_Hole_Result cap_hole(const EDGE edge) {
+Cap_Hole_Result cap_hole(const EDGE& edge) {
 	Cap_Hole_Result r;
 
 	auto& m = edge.mesh;
@@ -28,7 +28,7 @@ Cap_Hole_Result cap_hole(const EDGE edge) {
 	// iterators to perimeter, ordered by score
 	std::multimap<double, typename decltype(perimeter)::iterator> cands;
 
-	std::unordered_map<decltype(edge.handle), typename decltype(cands)::iterator> where_cands;
+	std::unordered_map<std::remove_cv_t<decltype(edge.handle)>, typename decltype(cands)::iterator> where_cands;
 
 
 	auto get_score = [](auto e0, auto e1){

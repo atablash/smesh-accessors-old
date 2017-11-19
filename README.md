@@ -4,13 +4,14 @@
 
 * Easy to use modern C++ interface
 * Algorithms separated from mesh structure using templates
+* Can write adapters for other libraries' mesh objects
 * Optimized for speed
 
 # Using the library
 
 ## Accessors
 
-Accessors, or views, are objects that provide simple interface for underlying raw structures.
+Accessors, or views, are objects that provide a simple interface for underlying raw structures.
 
 Where possible, data is exposed using member references instead of member functions, to minimize number of `()`s in code.
 

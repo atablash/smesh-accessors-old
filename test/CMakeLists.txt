@@ -10,6 +10,7 @@ set(sources
 	compute-normals.cpp
 	links.cpp
 	cap-holes.cpp
+	collapse-edges.cpp
 )
 
 if (SMESH_WITH_TINYPLY)
