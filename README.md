@@ -5,13 +5,15 @@
 * Easy to use modern C++ interface
 * Algorithms separated from mesh structure using templates
 * Can write adapters for other libraries' mesh objects
-* Optimized for speed
+* Optimized for speed (well, not yet, but library design makes it possible)
 
 # Using the library
 
 ## Accessors
 
-Accessors, or views, are objects that provide a simple interface for underlying raw structures.
+Accessors, or views (or proxy objects), are objects that provide a simple interface for accessing underlying raw structures.
+
+This concept is present in the standard C++ library too, for pseudo-reference objects returned by `std::bitset<N>::operator[]` and `std::vector<bool>::operator[]`.
 
 Where possible, data is exposed using member references instead of member functions, to minimize number of `()`s in code.
 
@@ -25,6 +27,24 @@ Note that accessors are constructed on demand and passed **by value**, like in t
 One exception is the `mesh` object itself - **it is returned by reference**, not accessor, so make sure to account for this when retrieving parent mesh object from e.g. vertices:
 
 	auto& mesh = vertex.mesh;
+
+### Dangers
+
+While some member variables of accessor objects are real references, some of them are not, and can be invalidated. E.g.:
+
+	for(auto p : mesh.polys) {
+		for(auto pe : p.edges) {
+			ASSERT( pe.has_link ); // assume this half-edge is linked to other half edge
+			pe.unlink();
+			ASSERT( !pe.has_link ); // FAILS! `has_link` is not updated
+		}
+	}
+
+Generally, you should avoid storing accessors, but use them as temporary objects instead.
+
+If you have accessor that might have been invalidated, call `update()` or `operator()()` on it, to get a new updated accessor:
+
+	ASSERT( !pe().has_link ); // now it works as desired
 
 ## Construction
 

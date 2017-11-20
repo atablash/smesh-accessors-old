@@ -80,5 +80,9 @@ constexpr X operator & (X lhs, X rhs)                                           
         static_cast<underlying>(lhs) &                                            \
         static_cast<underlying>(rhs)                                              \
     );                                                                            \
-}
+}                                                                                 \
+                                                                                  \
+constexpr bool operator ! (X x) { return !std::underlying_type_t<X>(x); }
+
+#define CHECK_FLAG(var,flag_name) bool(var & decltype(var)::flag_name)
 
