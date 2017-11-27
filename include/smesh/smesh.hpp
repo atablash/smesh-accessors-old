@@ -230,8 +230,8 @@ namespace {
 //
 template <
 	class SCALAR,
-	class SMESH_PROPS = _Default__Smesh_Props,
-	auto FLAGS = _default__Smesh_Flags
+	auto FLAGS = _default__Smesh_Flags,
+	class SMESH_PROPS = _Default__Smesh_Props
 >
 class Smesh {
 
@@ -245,11 +245,11 @@ private:
 	template<class T> using Type_Or_Void = std::conditional_t< std::is_same_v<T,void>, Void, T >;
 
 public:
+	static constexpr Smesh_Flags Flags = FLAGS;
+
 	using Vert_Props =      Type_Or_Void< typename SMESH_PROPS::Vert >;
 	using Poly_Props =      Type_Or_Void< typename SMESH_PROPS::Poly >;
 	using Poly_Vert_Props = Type_Or_Void< typename SMESH_PROPS::Poly_Vert >;
-
-	static constexpr Smesh_Flags Flags = FLAGS;
 
 	static constexpr bool Has_Edge_Links = bool(Flags & EDGE_LINKS);
 	static constexpr bool Has_Vert_Poly_Links = bool(Flags & VERT_POLY_LINKS);
@@ -441,7 +441,7 @@ public:
 		raw_verts_deleted = std::move(o.raw_verts_deleted);
 		raw_polys         = std::move(o.raw_polys);
 		raw_polys_deleted = std::move(o.raw_polys_deleted);
-		
+
 		return *this;
 	}
 
@@ -1328,8 +1328,8 @@ inline std::ostream& operator<<(std::ostream& s, const g_H_Poly_Edge& pe) {
 
 
 // ostream
-template<class SCALAR, class OPTIONS, Smesh_Flags FLAGS, Const_Flag C>
-std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, OPTIONS, FLAGS>::template A_Poly<C>& a_poly) {
+template<class SCALAR, Smesh_Flags FLAGS, class OPTIONS, Const_Flag C>
+std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, FLAGS, OPTIONS>::template A_Poly<C>& a_poly) {
 	stream << "poly(idx:" << a_poly.idx << ",indices:" <<
 		a_poly.verts[0].idx << "," <<
 		a_poly.verts[1].idx << "," <<
@@ -1360,12 +1360,12 @@ std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, OPTI
 
 // BUILDER
 template<class SCALAR,
-	class PROPS = _Default__Smesh_Props,
-	auto  FLAGS = _default__Smesh_Flags>
+	auto  FLAGS = _default__Smesh_Flags,
+	class PROPS = _Default__Smesh_Props>
 class Smesh_Builder {
 private:
-	template<class S, class P, Smesh_Flags F>
-	using _Smesh = Smesh<S,P,F>;
+	template<class S, Smesh_Flags F, class P>
+	using _Smesh = Smesh<S,F,P>;
 
 	template<class VERT, class POLY, class POLY_VERT>
 	struct Props {
@@ -1375,28 +1375,28 @@ private:
 	};
 
 public:
-	using Smesh = _Smesh<SCALAR, PROPS, FLAGS>;
+	using Smesh = _Smesh<SCALAR, FLAGS, PROPS>;
 
 	template<class NEW_VERT_PROPS>
-	using Vert_Props      = Smesh_Builder<SCALAR,
-		Props<NEW_VERT_PROPS, typename PROPS::Poly, typename PROPS::Poly_Vert>, FLAGS>;
+	using Vert_Props      = Smesh_Builder<SCALAR, FLAGS,
+		Props<NEW_VERT_PROPS, typename PROPS::Poly, typename PROPS::Poly_Vert>>;
 	
 	template<class NEW_POLY_PROPS>
-	using Poly_Props      = Smesh_Builder<SCALAR,
-		Props<typename PROPS::Vert, NEW_POLY_PROPS, typename PROPS::Poly_Vert>, FLAGS>;
+	using Poly_Props      = Smesh_Builder<SCALAR, FLAGS,
+		Props<typename PROPS::Vert, NEW_POLY_PROPS, typename PROPS::Poly_Vert>>;
 
 	template<class NEW_POLY_VERT_PROPS>
-	using Poly_Vert_Props = Smesh_Builder<SCALAR,
-		Props<typename PROPS::Vert, typename PROPS::Poly, NEW_POLY_VERT_PROPS>, FLAGS>;
+	using Poly_Vert_Props = Smesh_Builder<SCALAR, FLAGS,
+		Props<typename PROPS::Vert, typename PROPS::Poly, NEW_POLY_VERT_PROPS>>;
 
 	template<Smesh_Flags NEW_FLAGS>
-	using Flags           = Smesh_Builder<SCALAR, PROPS, NEW_FLAGS>;
+	using Flags           = Smesh_Builder<SCALAR, NEW_FLAGS, PROPS>;
 
 	template<Smesh_Flags NEW_FLAGS>
-	using Add_Flags       = Smesh_Builder<SCALAR, PROPS, FLAGS |  NEW_FLAGS>;
+	using Add_Flags       = Smesh_Builder<SCALAR, FLAGS |  NEW_FLAGS, PROPS>;
 
 	template<Smesh_Flags NEW_FLAGS>
-	using Remove_Flags    = Smesh_Builder<SCALAR, PROPS, FLAGS & ~NEW_FLAGS>;
+	using Remove_Flags    = Smesh_Builder<SCALAR, FLAGS & ~NEW_FLAGS, PROPS>;
 };
 
 
