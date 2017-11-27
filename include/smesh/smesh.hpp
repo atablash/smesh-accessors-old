@@ -61,10 +61,16 @@ enum class Smesh_Flags {
 	VERT_POLY_LINKS = 0x0008
 };
 
-ENABLE_BITMASK_OPERATORS(Smesh_Flags)
+namespace {
+	constexpr auto VERTS_LAZY_DEL  = Smesh_Flags::VERTS_LAZY_DEL;
+	constexpr auto POLYS_LAZY_DEL  = Smesh_Flags::POLYS_LAZY_DEL;
+	constexpr auto EDGE_LINKS      = Smesh_Flags::EDGE_LINKS;
+	constexpr auto VERT_POLY_LINKS = Smesh_Flags::VERT_POLY_LINKS;
+};
 
 
-struct Void {};
+ENABLE_BITMASK_OPERATORS( Smesh_Flags );
+
 
 
 
@@ -77,15 +83,17 @@ template<>     struct Add_Member_del<false> {};
 
 
 // link to the other half-edge
-template<class MESH,bool> struct Add_Member_edge_link { typename MESH::H_Poly_Vert edge_link; };
-template<class MESH>      struct Add_Member_edge_link <MESH, false> {};
+template<bool, class MESH> struct Add_Member_edge_link { typename MESH::H_Poly_Vert edge_link; };
+template<      class MESH> struct Add_Member_edge_link <false, MESH> {};
 
 
 
 // link to the other half-edge
 // optim TODO: replace with small object optimization vector
-template<class MESH,bool> struct Add_Member_poly_links { std::unordered_set<typename MESH::H_Poly_Vert> poly_links; };
-template<class MESH>      struct Add_Member_poly_links <MESH, false> {};
+template<bool, class MESH> struct Add_Member_poly_links { std::unordered_set<typename MESH::H_Poly_Vert> poly_links; };
+template<      class MESH> struct Add_Member_poly_links <false, MESH> {};
+
+
 
 
 
@@ -95,15 +103,21 @@ enum class Const_Flag {
 	TRUE = 1
 };
 
-template<class T, Const_Flag c> using Const = std::conditional_t<c == Const_Flag::TRUE, const T, T>;
+namespace {
+	constexpr auto MUTAB = Const_Flag::FALSE;
+	constexpr auto CONST = Const_Flag::TRUE;
+};
+
+
+template<class T, Const_Flag c> using Const = std::conditional_t<c == CONST, const T, T>;
 
 
 
 
 struct Smesh_Options {
-	Void Vert_Props();
-	Void Poly_Props();
-	Void Poly_Vert_Props();
+	auto Vert_Props()      -> void;
+	auto Poly_Props()      -> void;
+	auto Poly_Vert_Props() -> void;
 };
 
 
@@ -215,10 +229,8 @@ template <
 	class SCALAR,
 	class OPTIONS = Smesh_Options,
 	Smesh_Flags FLAGS =
-		Smesh_Flags::VERTS_LAZY_DEL |
-		Smesh_Flags::POLYS_LAZY_DEL |
-		Smesh_Flags::EDGE_LINKS |
-		Smesh_Flags::VERT_POLY_LINKS
+		VERTS_LAZY_DEL | POLYS_LAZY_DEL |
+		EDGE_LINKS | VERT_POLY_LINKS
 >
 class Smesh {
 
@@ -227,14 +239,19 @@ public:
 	using Pos = Eigen::Matrix<Scalar,3,1>;
 	using Idx = int32_t; // vertex index type
 
-	using Vert_Props = decltype(OPTIONS().Vert_Props());
-	using Poly_Props = decltype(OPTIONS().Poly_Props());
-	using Poly_Vert_Props = decltype(OPTIONS().Poly_Vert_Props());
+private:
+	struct Void {};
+	template<class T> using Type_Or_Void = std::conditional_t< std::is_same_v<T,void>, Void, T >;
+
+public:
+	using Vert_Props =      Type_Or_Void< decltype( OPTIONS().Vert_Props() ) >;
+	using Poly_Props =      Type_Or_Void< decltype( OPTIONS().Poly_Props() ) >;
+	using Poly_Vert_Props = Type_Or_Void< decltype( OPTIONS().Poly_Vert_Props() ) >;
 
 	static constexpr Smesh_Flags Flags = FLAGS;
 
-	static constexpr bool Has_Edge_Links = bool(Flags & Smesh_Flags::EDGE_LINKS);
-	static constexpr bool Has_Vert_Poly_Links = bool(Flags & Smesh_Flags::VERT_POLY_LINKS);
+	static constexpr bool Has_Edge_Links = bool(Flags & EDGE_LINKS);
+	static constexpr bool Has_Vert_Poly_Links = bool(Flags & VERT_POLY_LINKS);
 
 	static constexpr bool Has_Vert_Props = !std::is_same_v<Vert_Props, Void>;
 	static constexpr bool Has_Poly_Props = !std::is_same_v<Poly_Props, Void>;
@@ -358,8 +375,8 @@ public:
 //
 private:
 	struct Vert : public Vert_Props,
-			public Add_Member_del<bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)>,
-			public Add_Member_poly_links<Smesh, bool(Flags & Smesh_Flags::VERT_POLY_LINKS)> {
+			public Add_Member_del        <bool(Flags & VERTS_LAZY_DEL)>,
+			public Add_Member_poly_links <bool(Flags & VERT_POLY_LINKS), Smesh> {
 		Vert() {}
 		
 		template<class A_POS>
@@ -369,11 +386,11 @@ private:
 	};
 	
 	struct Poly_Vert : public Poly_Vert_Props,
-			public Add_Member_edge_link<Smesh, bool(Flags & Smesh_Flags::EDGE_LINKS)> { // vertex and corresponidng edge
+			public Add_Member_edge_link<bool(Flags & EDGE_LINKS), Smesh> { // vertex and corresponidng edge
 		Idx idx; // vertex index
 	};
 	
-	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)> {
+	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & POLYS_LAZY_DEL)> {
 		std::array<Poly_Vert, POLY_SIZE> verts;
 	};
 	
@@ -624,7 +641,7 @@ public:
 		}
 
 		int size() const {
-			if constexpr(!bool(Flags & Smesh_Flags::VERTS_LAZY_DEL)) return raw().size();
+			if constexpr(!bool(Flags & VERTS_LAZY_DEL)) return raw().size();
 
 			return raw().size() - smesh->raw_verts_deleted;
 		}
@@ -714,7 +731,7 @@ public:
 
 		int size() const {
 
-			if constexpr(!bool(Flags & Smesh_Flags::POLYS_LAZY_DEL)) {
+			if constexpr(!bool(Flags & POLYS_LAZY_DEL)) {
 				return raw().size();
 			}
 
@@ -856,7 +873,7 @@ public:
 				poly_links(m, v),
 				smesh(m) {
 
-			if constexpr(bool(Flags & Smesh_Flags::VERTS_LAZY_DEL))
+			if constexpr(bool(Flags & VERTS_LAZY_DEL))
 				DCHECK(!m.raw_verts[v].del) << "vertex is already deleted";
 		}
 
@@ -898,14 +915,14 @@ public:
 			DCHECK( !smesh.raw_polys[idx].del );
 
 			// unlink edges
-			if constexpr(bool(Flags & Smesh_Flags::EDGE_LINKS)) {
+			if constexpr(bool(Flags & EDGE_LINKS)) {
 				for(auto pe : edges) {
 					if(pe.has_link) pe.unlink();
 				}
 			}
 
 			// unlink vertices
-			if constexpr(bool(Flags & Smesh_Flags::VERT_POLY_LINKS)) {
+			if constexpr(bool(Flags & VERT_POLY_LINKS)) {
 				for(auto pv : verts) {
 					pv.vert.raw().poly_links.erase(pv.handle);
 				}
@@ -946,7 +963,7 @@ public:
 			//DCHECK_NE(raw().verts[1].idx, raw().verts[2].idx) << "polygon is degenerate";
 			//DCHECK_NE(raw().verts[2].idx, raw().verts[0].idx) << "polygon is degenerate";
 
-			if constexpr(bool(Flags & Smesh_Flags::POLYS_LAZY_DEL))
+			if constexpr(bool(Flags & POLYS_LAZY_DEL))
 				DCHECK( !m.raw_polys[p].del ) << "polygon is deleted";
 		}
 

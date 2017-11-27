@@ -16,7 +16,7 @@ struct V_Props_normal {
 };
 
 struct Smesh_Options_vnormal : Smesh_Options {
-	V_Props_normal Vert_Props();
+	auto Vert_Props() -> V_Props_normal;
 };
 
 using Mesh = Smesh<double, Smesh_Options_vnormal, Smesh_Flags::NONE>;

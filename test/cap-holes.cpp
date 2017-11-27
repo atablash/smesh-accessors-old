@@ -18,7 +18,7 @@ using namespace smesh;
 
 
 
-using Mesh = Smesh<double, Smesh_Options>;
+using Mesh = Smesh<double>;
 
 
 

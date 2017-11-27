@@ -63,12 +63,12 @@ A structure that encodes some of the types used in `Smesh`.
 Default types are encoded as follows:
 
 	struct Smesh_Options {
-		Void Vert_Props();
-		Void Poly_Props();
-		Void Poly_Vert_Props();
+		auto Vert_Props()      -> void;
+		auto Poly_Props()      -> void;
+		auto Poly_Vert_Props() -> void;
 	};
 
-Meaning that `Vert_Props` is `Void` (empty struct), and so on.
+Meaning that `Vert_Props` is `void`, and so on.
 
 **TODO:** Implement `Indexed_Vert_Props` - vertex properties that are owned by *vertices* and assigned to one or more *polygon-vertices*. The idea is to have usual vertex properties blending during e.g. edge collapsing, while allowing several classes of polygons, with e.g. different textures/materials that don't interfere with each other.
 
@@ -78,11 +78,11 @@ To override some of the default types, derive from `Smesh_Options`:
 		Eigen::Matrix<double,3,1> normal;
 	};
 
-	struct Smesh_Options_vnormal : Smesh_Options {
+	struct Smesh_Options__vnormal : Smesh_Options {
 		V_Props_normal Vert_Props();
 	};
 
-	Smesh<double, Smesh_Options_vnormal> mesh;
+	Smesh<double, Smesh_Options__vnormal> mesh;
 
 The result is a mesh with additional normals as vertex properties.
 
