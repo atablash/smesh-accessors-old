@@ -231,7 +231,7 @@ namespace {
 template <
 	class SCALAR,
 	class SMESH_PROPS = _Default__Smesh_Props,
-	Smesh_Flags FLAGS = _default__Smesh_Flags
+	auto FLAGS = _default__Smesh_Flags
 >
 class Smesh {
 
@@ -431,6 +431,8 @@ public:
 		raw_verts_deleted = o.raw_verts_deleted;
 		raw_polys         = o.raw_polys;
 		raw_polys_deleted = o.raw_polys_deleted;
+
+		return *this;
 	}
 
 
@@ -439,6 +441,8 @@ public:
 		raw_verts_deleted = std::move(o.raw_verts_deleted);
 		raw_polys         = std::move(o.raw_polys);
 		raw_polys_deleted = std::move(o.raw_polys_deleted);
+		
+		return *this;
 	}
 
 
@@ -456,20 +460,20 @@ private:
 			typename CONTAINER::iterator>;
 
 	public:
-		Iterator& operator++() {
+		auto& operator++() {
 			increment();
 			return *this; }
 
-		Iterator operator++(int) {
+		auto operator++(int) {
 			auto old = *this;
 			increment();
 			return old; }
 
-		Iterator& operator--() {
+		auto& operator--() {
 			decrement();
 			return *this; }
 
-		Iterator operator--(int) {
+		auto operator--(int) {
 			auto old = *this;
 			decrement();
 			return old; }
@@ -526,20 +530,20 @@ private:
 	template<class A, class CONTAINER, class EXTRA, class GET_A>
 	class Index_Iterator {
 	public:
-		Index_Iterator& operator++() {
+		auto& operator++() {
 			increment();
 			return *this; }
 
-		Index_Iterator operator++(int) {
+		auto operator++(int) {
 			auto old = *this;
 			increment();
 			return old; }
 
-		Index_Iterator& operator--() {
+		auto& operator--() {
 			decrement();
 			return *this; }
 
-		Index_Iterator operator--(int) {
+		auto operator--(int) {
 			auto old = *this;
 			decrement();
 			return old; }
@@ -618,18 +622,18 @@ public:
 	// does not have const flag - constness is decided by *this constness in this case
 	class A_Verts {
 	public:
-		A_Vert<MUTAB> add() {
+		auto add() {
 			raw().emplace_back();
 			return A_Vert<MUTAB> {*smesh, raw().back()};
 		}
 		
 		template<class POS_>
-		A_Vert<MUTAB> add(POS_&& pos) {
+		auto add(POS_&& pos) {
 			raw().emplace_back(pos);
 			return A_Vert<MUTAB> {*smesh, raw().back()};
 		}
 		
-		A_Vert<MUTAB> add(const Scalar& x, const Scalar& y, const Scalar& z) {
+		auto add(const Scalar& x, const Scalar& y, const Scalar& z) {
 			raw().emplace_back(Pos{x,y,z});
 			return A_Vert<MUTAB> (*smesh, raw().size()-1);
 		}
@@ -813,18 +817,18 @@ public:
 			smesh.raw_verts[vert].poly_links.clear();
 		}
 
-		A_Poly_Vert<C> operator[](int i) const {
+		auto operator[](int i) const {
 			const auto& poly_link = smesh.raw_verts[vert].poly_links[i];
 			return A_Poly_Vert<C>(smesh, poly_link.poly, poly_link.vert);
 		}
 
 
 		// iterator
-		I_Poly_Link<C> begin() const {
+		auto begin() const {
 			return I_Poly_Link<C>(smesh, smesh.raw_verts[vert].poly_links.begin());
 		}
 
-		I_Poly_Link<C> end() const {
+		auto end() const {
 			return I_Poly_Link<C>(smesh, smesh.raw_verts[vert].poly_links.end());
 		}
 
@@ -1002,16 +1006,16 @@ public:
 			return POLY_SIZE;
 		}
 
-		A_Poly_Vert<C> operator[]( decltype(H_Poly_Vert::vert) i ) const {
+		auto operator[]( decltype(H_Poly_Vert::vert) i ) const {
 			check_idx(i);
 			return A_Poly_Vert<C>( smesh, poly, i );
 		}
 
-		I_Poly_Vert<C> begin() const {
+		auto begin() const {
 			return I_Poly_Vert<C>( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
 		}
 
-		I_Poly_Vert<C> end() const {
+		auto end() const {
 			return I_Poly_Vert<C>( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
 		}
 
@@ -1047,16 +1051,16 @@ public:
 			return POLY_SIZE;
 		}
 
-		A_Poly_Edge<C> operator[]( int i ) const {
+		auto operator[]( int i ) const {
 			check_idx(i);
 			return A_Poly_Edge<C>( smesh, poly, i );
 		}
 
-		I_Poly_Edge<C> begin() const {
+		auto begin() const {
 			return I_Poly_Edge<C>( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
 		}
 
-		I_Poly_Edge<C> end() const {
+		auto end() const {
 			return I_Poly_Edge<C>( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
 		}
 
@@ -1356,8 +1360,8 @@ std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, OPTI
 
 // BUILDER
 template<class SCALAR,
-	class PROPS =       _Default__Smesh_Props,
-	Smesh_Flags FLAGS = _default__Smesh_Flags>
+	class PROPS = _Default__Smesh_Props,
+	auto  FLAGS = _default__Smesh_Flags>
 class Smesh_Builder {
 private:
 	template<class S, class P, Smesh_Flags F>
