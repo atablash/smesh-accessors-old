@@ -48,55 +48,42 @@ If you have accessor that might have been invalidated, call `update()` or `opera
 
 ## Construction
 
-The `Smesh` class has following template parameters:
+The `Smesh` template has one mandatory parameter - `SCALAR`, i.e. vertex position coordinate type:
 
-	Smesh<SCALAR, OPTIONS = Mesh_Options, FLAGS = ...>
+	auto mesh = Smesh<double>();
 
-### `SCALAR`
+### Builder
 
-What scalar type to use for vertex positions. E.g. `double`.
+To customize the `Smesh` object, use `Smesh_Builder` template:
 
-### `OPTIONS`
-
-A structure that encodes some of the types used in `Smesh`.
-
-Default types are encoded as follows:
-
-	struct Smesh_Options {
-		auto Vert_Props()      -> void;
-		auto Poly_Props()      -> void;
-		auto Poly_Vert_Props() -> void;
-	};
-
-Meaning that `Vert_Props` is `void`, and so on.
-
-**TODO:** Implement `Indexed_Vert_Props` - vertex properties that are owned by *vertices* and assigned to one or more *polygon-vertices*. The idea is to have usual vertex properties blending during e.g. edge collapsing, while allowing several classes of polygons, with e.g. different textures/materials that don't interfere with each other.
-
-To override some of the default types, derive from `Smesh_Options`:
-
-	struct V_Props_normal {
+	// Define some custom vertex attributes
+	struct My_Vert_Props {
 		Eigen::Matrix<double,3,1> normal;
 	};
 
-	struct Smesh_Options__vnormal : Smesh_Options {
-		V_Props_normal Vert_Props();
-	};
+	// Define the mesh type using above vertex properties, and clear default flags
+	using My_Mesh = Smesh_Builder<double>::Vert_Props( My_Vert_Props )::Flags( Smesh_Flags::NONE )::Smesh;
+	auto mesh = My_Mesh();
 
-	Smesh<double, Smesh_Options__vnormal> mesh;
+To make prototyping easier, *Smesh* has some functionality enabled by default. Use `Smesh_Flags::NONE` to disable all this stuff and make your program run faster.
 
-The result is a mesh with additional normals as vertex properties.
+**TODO:** Implement `Indexed_Vert_Props` - vertex properties that are owned by *vertices* and assigned to one or more *polygon-vertices*. The idea is to have usual vertex properties blending during e.g. edge collapsing, while allowing several classes of polygons, with e.g. different textures/materials that don't interfere with each other.
 
-### `FLAGS`
+### Flags
 
-A combination of bit flags:
+A combination of bit flags of type `Smehs_Flags`:
 
-* `NONE = 0` representing no flags
+* `Smesh_Flags::NONE = 0` representing no flags
 * `VERTS_LAZY_DEL` (default: on) - turns on vertices lazy removal
 * `POLYS_LAZY_DEL` (default: on) - turns on polygons lazy removal
 * `EDGE_LINKS` (default: on) - turns on *edge links*
 * `VERT_POLY_LINKS` (default: on) - turns on *vertex-polygon* links (or *vertex-(polygon-vertex)* to be precise)
 
-Flags are defined using `enum class` with overloaded operator `|` and `&`. Conversion to *bool* requires implicit cast.
+Flags are defined using `enum class` with some bitwise and boolean operators defined, e.g. `|`, `&`, `~`, `!`. Conversion to *bool* requires an implicit cast:
+
+	Mesh_Flags flags = EDGE_LINKS | VERT_POLY_LINKS;
+	if(bool( flags & EDGE_LINKS )) {
+		...
 
 ## Special properties
 

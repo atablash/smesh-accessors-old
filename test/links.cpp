@@ -14,15 +14,14 @@ using namespace smesh;
 
 
 
-using Mesh = Smesh<double>;
-
-
 
 
 
 TEST(Edge_links, fast_compute_edge_links_cube) {
 
-	auto mesh = get_cube_mesh< Smesh<double, Smesh_Options, Smesh_Flags::EDGE_LINKS> >();
+	auto mesh = get_cube_mesh<
+		Smesh_Builder<double>::Flags<EDGE_LINKS>::Smesh
+	>();
 
 	auto r = fast_compute_edge_links(mesh);
 
@@ -38,7 +37,9 @@ TEST(Edge_links, fast_compute_edge_links_cube) {
 
 TEST(Vert_poly_links, compute_vert_poly_links_cube) {
 
-	auto mesh = get_cube_mesh< Smesh<double, Smesh_Options, Smesh_Flags::VERT_POLY_LINKS> >();
+	auto mesh = get_cube_mesh<
+		Smesh_Builder<double>::Flags<VERT_POLY_LINKS>::Smesh
+	>();
 
 	compute_vert_poly_links(mesh);
 
@@ -51,9 +52,7 @@ TEST(Vert_poly_links, compute_vert_poly_links_cube) {
 TEST(Links, compute_links_cube) {
 
 	auto mesh = get_cube_mesh<
-		Smesh<double, Smesh_Options,
-			Smesh_Flags::EDGE_LINKS |
-			Smesh_Flags::VERT_POLY_LINKS>
+		Smesh_Builder<double>::Flags< EDGE_LINKS | VERT_POLY_LINKS >::Smesh
 	>();
 
 	{

@@ -11,15 +11,13 @@ using namespace smesh;
 
 
 
-struct V_Props_normal {
+struct Vert_Props_normal {
 	Eigen::Matrix<double,3,1> normal;
 };
 
-struct Smesh_Options_vnormal : Smesh_Options {
-	auto Vert_Props() -> V_Props_normal;
-};
 
-using Mesh = Smesh<double, Smesh_Options_vnormal, Smesh_Flags::NONE>;
+using Mesh = Smesh_Builder<double>::Vert_Props< Vert_Props_normal >::Smesh;
+
 
 TEST(Fast_compute_vert_normals, cube) {
 

@@ -65,24 +65,38 @@ struct has_member_##member                                                      
                                                                                   \
 constexpr X operator | (X lhs, X rhs)                                             \
 {                                                                                 \
-    using underlying = typename std::underlying_type<X>::type;                    \
+    using underlying = typename std::underlying_type_t<X>;                        \
     return static_cast<X> (                                                       \
         static_cast<underlying>(lhs) |                                            \
         static_cast<underlying>(rhs)                                              \
     );                                                                            \
 }                                                                                 \
                                                                                   \
-                                                                                  \
 constexpr X operator & (X lhs, X rhs)                                             \
 {                                                                                 \
-    using underlying = typename std::underlying_type<X>::type;                    \
+    using underlying = typename std::underlying_type_t<X>;                        \
     return static_cast<X> (                                                       \
         static_cast<underlying>(lhs) &                                            \
         static_cast<underlying>(rhs)                                              \
     );                                                                            \
 }                                                                                 \
                                                                                   \
-constexpr bool operator ! (X x) { return !std::underlying_type_t<X>(x); }
+constexpr X operator ! (X x)                                                      \
+{                                                                                 \
+    using underlying = typename std::underlying_type_t<X>;                        \
+    return static_cast<X> (                                                       \
+        ! static_cast<underlying>(x)                                              \
+    );                                                                            \
+}                                                                                 \
+                                                                                  \
+constexpr X operator ~ (X x)                                                      \
+{                                                                                 \
+    using underlying = typename std::underlying_type_t<X>;                        \
+    return static_cast<X> (                                                       \
+        ~ static_cast<underlying>(x)                                              \
+    );                                                                            \
+}
+
 
 #define CHECK_FLAG(var,flag_name) bool(var & decltype(var)::flag_name)
 

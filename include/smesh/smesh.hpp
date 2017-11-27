@@ -99,26 +99,17 @@ template<      class MESH> struct Add_Member_poly_links <false, MESH> {};
 
 
 enum class Const_Flag {
-	FALSE = 0,
-	TRUE = 1
+	MUTAB = 0,
+	CONST = 1
 };
 
 namespace {
-	constexpr auto MUTAB = Const_Flag::FALSE;
-	constexpr auto CONST = Const_Flag::TRUE;
+	constexpr auto MUTAB = Const_Flag::MUTAB;
+	constexpr auto CONST = Const_Flag::CONST;
 };
-
 
 template<class T, Const_Flag c> using Const = std::conditional_t<c == CONST, const T, T>;
 
-
-
-
-struct Smesh_Options {
-	auto Vert_Props()      -> void;
-	auto Poly_Props()      -> void;
-	auto Poly_Vert_Props() -> void;
-};
 
 
 
@@ -217,6 +208,18 @@ struct g_H_Poly_Edge {
 
 
 
+namespace {
+
+	struct _Default__Smesh_Props {
+		using Vert = void;
+		using Poly = void;
+		using Poly_Vert = void;
+	};
+
+	constexpr Smesh_Flags _default__Smesh_Flags =
+		VERTS_LAZY_DEL | POLYS_LAZY_DEL |
+		EDGE_LINKS | VERT_POLY_LINKS;
+}
 
 
 
@@ -227,10 +230,8 @@ struct g_H_Poly_Edge {
 //
 template <
 	class SCALAR,
-	class OPTIONS = Smesh_Options,
-	Smesh_Flags FLAGS =
-		VERTS_LAZY_DEL | POLYS_LAZY_DEL |
-		EDGE_LINKS | VERT_POLY_LINKS
+	class SMESH_PROPS = _Default__Smesh_Props,
+	Smesh_Flags FLAGS = _default__Smesh_Flags
 >
 class Smesh {
 
@@ -244,9 +245,9 @@ private:
 	template<class T> using Type_Or_Void = std::conditional_t< std::is_same_v<T,void>, Void, T >;
 
 public:
-	using Vert_Props =      Type_Or_Void< decltype( OPTIONS().Vert_Props() ) >;
-	using Poly_Props =      Type_Or_Void< decltype( OPTIONS().Poly_Props() ) >;
-	using Poly_Vert_Props = Type_Or_Void< decltype( OPTIONS().Poly_Vert_Props() ) >;
+	using Vert_Props =      Type_Or_Void< typename SMESH_PROPS::Vert >;
+	using Poly_Props =      Type_Or_Void< typename SMESH_PROPS::Poly >;
+	using Poly_Vert_Props = Type_Or_Void< typename SMESH_PROPS::Poly_Vert >;
 
 	static constexpr Smesh_Flags Flags = FLAGS;
 
@@ -298,8 +299,8 @@ public:
 
 	template<Const_Flag> class A_Poly_Verts;
 	template<Const_Flag> class A_Poly_Vert;
-	using VA_Poly_Vert = A_Poly_Vert<Const_Flag::FALSE>;
-	using CA_Poly_Vert = A_Poly_Vert<Const_Flag::TRUE>;
+	using VA_Poly_Vert = A_Poly_Vert<MUTAB>;
+	using CA_Poly_Vert = A_Poly_Vert<CONST>;
 
 
 	template<class A, Const_Flag C>
@@ -328,8 +329,8 @@ public:
 
 	template<Const_Flag> class A_Poly_Edges;
 	template<Const_Flag> class A_Poly_Edge;
-	using VA_Poly_Edge = A_Poly_Edge<Const_Flag::FALSE>;
-	using CA_Poly_Edge = A_Poly_Edge<Const_Flag::TRUE>;
+	using VA_Poly_Edge = A_Poly_Edge<MUTAB>;
+	using CA_Poly_Edge = A_Poly_Edge<CONST>;
 
 
 	template<Const_Flag C>
@@ -377,6 +378,7 @@ private:
 	struct Vert : public Vert_Props,
 			public Add_Member_del        <bool(Flags & VERTS_LAZY_DEL)>,
 			public Add_Member_poly_links <bool(Flags & VERT_POLY_LINKS), Smesh> {
+
 		Vert() {}
 		
 		template<class A_POS>
@@ -449,7 +451,7 @@ private:
 	//
 	template<class A, class CONTAINER, Const_Flag C, class EXTRA, class GET_A>
 	class Iterator {
-		using Container_Iterator = std::conditional_t<C == Const_Flag::TRUE,
+		using Container_Iterator = std::conditional_t<C == CONST,
 			typename CONTAINER::const_iterator,
 			typename CONTAINER::iterator>;
 
@@ -616,20 +618,20 @@ public:
 	// does not have const flag - constness is decided by *this constness in this case
 	class A_Verts {
 	public:
-		A_Vert<Const_Flag::FALSE> add() {
+		A_Vert<MUTAB> add() {
 			raw().emplace_back();
-			return A_Vert<Const_Flag::FALSE> {*smesh, raw().back()};
+			return A_Vert<MUTAB> {*smesh, raw().back()};
 		}
 		
 		template<class POS_>
-		A_Vert<Const_Flag::FALSE> add(POS_&& pos) {
+		A_Vert<MUTAB> add(POS_&& pos) {
 			raw().emplace_back(pos);
-			return A_Vert<Const_Flag::FALSE> {*smesh, raw().back()};
+			return A_Vert<MUTAB> {*smesh, raw().back()};
 		}
 		
-		A_Vert<Const_Flag::FALSE> add(const Scalar& x, const Scalar& y, const Scalar& z) {
+		A_Vert<MUTAB> add(const Scalar& x, const Scalar& y, const Scalar& z) {
 			raw().emplace_back(Pos{x,y,z});
-			return A_Vert<Const_Flag::FALSE> (*smesh, raw().size()-1);
+			return A_Vert<MUTAB> (*smesh, raw().size()-1);
 		}
 		
 		void reserve(int n) {
@@ -658,35 +660,35 @@ public:
 
 
 
-		A_Vert<Const_Flag::FALSE> operator[](int idx) {
+		auto operator[](int idx) {
 			check_idx(idx);
-			return A_Vert<Const_Flag::FALSE> {*smesh, idx};
+			return A_Vert<MUTAB> {*smesh, idx};
 		}
 
-		A_Vert<Const_Flag::TRUE> operator[](int idx) const {
+		auto operator[](int idx) const {
 			check_idx(idx);
-			return A_Vert<Const_Flag::TRUE> {*smesh, idx};
+			return A_Vert<CONST> {*smesh, idx};
 		}
 
 		
 
 		// iterator
-		I_Vert<Const_Flag::FALSE> begin() {
-			return I_Vert<Const_Flag::FALSE> (*smesh, raw(), 0);
+		auto begin() {
+			return I_Vert<MUTAB> (*smesh, raw(), 0);
 		}
 
-		I_Vert<Const_Flag::FALSE> end() {
-			return I_Vert<Const_Flag::FALSE> (*smesh, raw(), raw().size());
+		auto end() {
+			return I_Vert<MUTAB> (*smesh, raw(), raw().size());
 		}
 
 
 		// const iterator
-		I_Vert<Const_Flag::TRUE> begin() const {
-			return I_Vert<Const_Flag::TRUE> (*smesh, raw(), 0);
+		auto begin() const {
+			return I_Vert<CONST> (*smesh, raw(), 0);
 		}
 
-		I_Vert<Const_Flag::TRUE> end() const {
-			return I_Vert<Const_Flag::TRUE> (*smesh, raw(), raw().size());
+		auto end() const {
+			return I_Vert<CONST> (*smesh, raw(), raw().size());
 		}
 
 	private:
@@ -712,13 +714,13 @@ public:
 	class A_Polys {
 	public:
 
-		A_Poly<Const_Flag::FALSE> add(const Idx i0, const Idx i1, const Idx i2) {
+		auto add(const Idx i0, const Idx i1, const Idx i2) {
 			Poly p;
 			p.verts[0].idx = i0;
 			p.verts[1].idx = i1;
 			p.verts[2].idx = i2;
 			raw().emplace_back(std::move(p));
-			return A_Poly<Const_Flag::FALSE>(*smesh, raw().size()-1);
+			return A_Poly<MUTAB>(*smesh, raw().size()-1);
 		}
 		
 		void reserve( const int n ) {
@@ -738,34 +740,34 @@ public:
 			return raw().size() - smesh->raw_polys_deleted;
 		}
 		
-		A_Poly<Const_Flag::FALSE> operator[]( const int idx ) {
+		auto operator[]( const int idx ) {
 			DCHECK(0 <= idx && idx < (int)raw().size()) << "polygon index out of range";
-			return A_Poly<Const_Flag::FALSE> (*smesh, raw()[idx]);
+			return A_Poly<MUTAB> (*smesh, raw()[idx]);
 		}
 
-		A_Poly<Const_Flag::TRUE> operator[]( const int idx ) const {
+		auto operator[]( const int idx ) const {
 			DCHECK(0 <= idx && idx < (int)raw().size()) << "polygon index out of range";
-			return A_Poly<Const_Flag::TRUE> (*smesh, raw()[idx]);
+			return A_Poly<CONST> (*smesh, raw()[idx]);
 		}
 
 
 		// iterator
-		I_Poly<Const_Flag::FALSE> begin() {
-			return I_Poly<Const_Flag::FALSE> (*smesh, raw(), 0);
+		auto begin() {
+			return I_Poly<MUTAB> (*smesh, raw(), 0);
 		}
 
-		I_Poly<Const_Flag::FALSE> end() {
-			return I_Poly<Const_Flag::FALSE> (*smesh, raw(), raw().size());
+		auto end() {
+			return I_Poly<MUTAB> (*smesh, raw(), raw().size());
 		}
 
 
 		// const iterator
-		I_Poly<Const_Flag::TRUE> begin() const {
-			return I_Poly<Const_Flag::TRUE> (*smesh, raw(), 0);
+		auto begin() const {
+			return I_Poly<CONST> (*smesh, raw(), 0);
 		}
 
-		I_Poly<Const_Flag::TRUE> end() const {
-			return I_Poly<Const_Flag::TRUE> (*smesh, raw(), raw().size());
+		auto end() const {
+			return I_Poly<CONST> (*smesh, raw(), raw().size());
 		}
 
 	private:
@@ -1334,6 +1336,79 @@ std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, OPTI
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// BUILDER
+template<class SCALAR,
+	class PROPS =       _Default__Smesh_Props,
+	Smesh_Flags FLAGS = _default__Smesh_Flags>
+class Smesh_Builder {
+private:
+	template<class S, class P, Smesh_Flags F>
+	using _Smesh = Smesh<S,P,F>;
+
+	template<class VERT, class POLY, class POLY_VERT>
+	struct Props {
+		using Vert = VERT;
+		using Poly = POLY;
+		using Poly_Vert = POLY_VERT;
+	};
+
+public:
+	using Smesh = _Smesh<SCALAR, PROPS, FLAGS>;
+
+	template<class NEW_VERT_PROPS>
+	using Vert_Props      = Smesh_Builder<SCALAR,
+		Props<NEW_VERT_PROPS, typename PROPS::Poly, typename PROPS::Poly_Vert>, FLAGS>;
+	
+	template<class NEW_POLY_PROPS>
+	using Poly_Props      = Smesh_Builder<SCALAR,
+		Props<typename PROPS::Vert, NEW_POLY_PROPS, typename PROPS::Poly_Vert>, FLAGS>;
+
+	template<class NEW_POLY_VERT_PROPS>
+	using Poly_Vert_Props = Smesh_Builder<SCALAR,
+		Props<typename PROPS::Vert, typename PROPS::Poly, NEW_POLY_VERT_PROPS>, FLAGS>;
+
+	template<Smesh_Flags NEW_FLAGS>
+	using Flags           = Smesh_Builder<SCALAR, PROPS, NEW_FLAGS>;
+
+	template<Smesh_Flags NEW_FLAGS>
+	using Add_Flags       = Smesh_Builder<SCALAR, PROPS, FLAGS |  NEW_FLAGS>;
+
+	template<Smesh_Flags NEW_FLAGS>
+	using Remove_Flags    = Smesh_Builder<SCALAR, PROPS, FLAGS & ~NEW_FLAGS>;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 } // namespace smesh
 
 
@@ -1376,6 +1451,23 @@ struct hash<::smesh::g_H_Poly_Edge> { // why const?! bug in libstdc++?
 };
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
