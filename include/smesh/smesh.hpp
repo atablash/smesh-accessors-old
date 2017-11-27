@@ -216,7 +216,7 @@ namespace {
 		using Poly_Vert = void;
 	};
 
-	constexpr Smesh_Flags _default__Smesh_Flags =
+	constexpr Smesh_Flags _default__smesh_flags =
 		VERTS_LAZY_DEL | POLYS_LAZY_DEL |
 		EDGE_LINKS | VERT_POLY_LINKS;
 }
@@ -230,7 +230,7 @@ namespace {
 //
 template <
 	class SCALAR,
-	auto FLAGS = _default__Smesh_Flags,
+	auto FLAGS = _default__smesh_flags,
 	class SMESH_PROPS = _Default__Smesh_Props
 >
 class Smesh {
@@ -1360,7 +1360,7 @@ std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, FLAG
 
 // BUILDER
 template<class SCALAR,
-	auto  FLAGS = _default__Smesh_Flags,
+	auto  FLAGS = _default__smesh_flags,
 	class PROPS = _Default__Smesh_Props>
 class Smesh_Builder {
 private:
