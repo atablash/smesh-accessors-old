@@ -17,21 +17,26 @@ This concept is present in the standard C++ library too, for pseudo-reference ob
 
 Where possible, data is exposed using member references instead of member functions, to minimize number of `()`s in code.
 
+```cpp
 	for(auto v : mesh.verts) {
 		cout << "vertex " << v.idx << "position:" << endl;
 		cout << v.pos << endl;
 	}
+```
 
 Note that accessors are constructed on demand and passed **by value**, like in the above `for`-loop.
 
 One exception is the `mesh` object itself - **it is returned by reference**, not accessor, so make sure to account for this when retrieving parent mesh object from e.g. vertices:
 
+```cpp
 	auto& mesh = vertex.mesh;
+```
 
-### Dangers
+### Pitfails
 
 While some member variables of accessor objects are real references, some of them are not, and can be invalidated. E.g.:
 
+```cpp
 	for(auto p : mesh.polys) {
 		for(auto pe : p.edges) {
 			ASSERT( pe.has_link ); // assume this half-edge is linked to other half edge
@@ -39,23 +44,29 @@ While some member variables of accessor objects are real references, some of the
 			ASSERT( !pe.has_link ); // FAILS! `has_link` is not updated
 		}
 	}
+```
 
 Generally, you should avoid storing accessors, but use them as temporary objects instead.
 
 If you have accessor that might have been invalidated, call `update()` or `operator()()` on it, to get a new updated accessor:
 
+```cpp
 	ASSERT( !pe().has_link ); // now it works as desired
+```
 
 ## Construction
 
 The `Smesh` template has one mandatory parameter - `SCALAR`, i.e. vertex position coordinate type:
 
+```cpp
 	auto mesh = Smesh<double>();
+```
 
 ### Builder
 
 To customize the `Smesh` object, use `Smesh_Builder` template:
 
+```cpp
 	// Define some custom vertex attributes
 	struct My_Vert_Props {
 		Eigen::Matrix<double,3,1> normal;
@@ -64,6 +75,7 @@ To customize the `Smesh` object, use `Smesh_Builder` template:
 	// Define the mesh type using above vertex properties, and clear default flags
 	using My_Mesh = Smesh_Builder<double>::Vert_Props( My_Vert_Props )::Flags( Smesh_Flags::NONE )::Smesh;
 	auto mesh = My_Mesh();
+```
 
 To make prototyping easier, *Smesh* has some functionality enabled by default. Use `Smesh_Flags::NONE` to disable all this stuff and make your program run faster.
 
@@ -81,9 +93,11 @@ A combination of bit flags of type `Smehs_Flags`:
 
 Flags are defined using `enum class` with some bitwise and boolean operators defined, e.g. `|`, `&`, `~`, `!`. Conversion to *bool* requires an implicit cast:
 
+```cpp
 	Mesh_Flags flags = EDGE_LINKS | VERT_POLY_LINKS;
 	if(bool( flags & EDGE_LINKS )) {
 		...
+```
 
 ## Special properties
 
@@ -141,11 +155,15 @@ If you want to store references to vertices, polygons or other entities, use `ha
 
 To get a handle:
 
+```cpp
 	auto polygon_edge_handle = polygon_edge.handle;
+```
 
 To get back an accessor from handle, you need the parent mesh object:
 
+```cpp
 	auto polygon_edge = polygon_edge_handle(mesh);
+```
 
 # Accessor const-ness
 
