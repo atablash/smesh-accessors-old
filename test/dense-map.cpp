@@ -610,7 +610,7 @@ TEST(Vector_dense_map, perf) {
 
 	EXPECT_EQ(my_result, other_result);
 
-	EXPECT_LT(my_time, other_time*4);
+	EXPECT_LT(my_time, other_time*5.5);
 }
 
 
