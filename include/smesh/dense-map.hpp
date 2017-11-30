@@ -1,5 +1,6 @@
 #pragma once
 
+#include "common.hpp"
 #include "accessors-common.hpp"
 
 #include <glog/logging.h>
@@ -30,11 +31,43 @@ namespace {
 
 
 
+enum class Dense_Map_Flags {
+	NONE = 0,
+	ERASABLE = 0x0001
+};
+
+ENABLE_BITMASK_OPERATORS(Dense_Map_Flags);
+
+namespace {
+	constexpr auto ERASABLE = Dense_Map_Flags::ERASABLE;
+}
+
+
+
 
 
 namespace internal {
+	// for Dense_Map
 	template<bool> class Add_Member_offset {protected: int offset = 0; };
 	template<>     class Add_Member_offset <false> {};
+
+	// for Node
+	template<bool> struct Add_Member_exists { bool exists = false; };
+	template<>     struct Add_Member_exists <false> {};
+}
+
+
+
+
+
+
+
+namespace internal {
+	constexpr auto default__Dense_Map_Flags = ERASABLE;
+	constexpr auto default__Dense_Map_Type = VECTOR;
+
+	template<Const_Flag C, class OWNER, class BASE>
+	using Default__Dense_Map_Accessor_Template = Index_Accessor_Template<C, OWNER, BASE>;
 }
 
 
@@ -49,14 +82,13 @@ namespace internal {
 //
 // TODO: don't call constructors too early
 //
-// TODO: implement faster vector version (not deque)
-//
 // TODO: implement a linked version to jump empty spaces faster
 //
 template<
 	class T,
-	Dense_Map_Type TYPE = VECTOR,
-	template<Const_Flag,class,class> class ACCESSOR_TEMPLATE = internal::Index_Accessor_Template
+	Dense_Map_Flags FLAGS = internal::default__Dense_Map_Flags,
+	Dense_Map_Type TYPE = internal::default__Dense_Map_Type,
+	template<Const_Flag,class,class> class ACCESSOR_TEMPLATE = internal::Default__Dense_Map_Accessor_Template
 >
 class Dense_Map : public internal::Add_Member_offset<TYPE == DEQUE> {
 
@@ -68,6 +100,7 @@ class Dense_Map : public internal::Add_Member_offset<TYPE == DEQUE> {
 
 public:
 	using Mapped_Type = T;
+	static constexpr auto Flags = FLAGS;
 	using Container = std::conditional_t<TYPE == VECTOR, std::vector<Node>, std::deque<Node>>;
 	template<Const_Flag C> using Accessor = typename Accessor_Base<C>::Derived;
 
@@ -96,12 +129,12 @@ public:
 
 	template<class VAL>
 	inline void push_back(VAL&& val) {
-		raw.push_back({true, std::forward<VAL>(val)});
+		raw.push_back(std::forward<VAL>(val));
 	}
 
 	template<class... Args>
 	void emplace_back(Args&&... args) {
-		raw.emplace_back(true, {std::forward<Args>(args)... });
+		raw.emplace_back(std::forward<Args>(args)... );
 	}
 
 
@@ -170,7 +203,7 @@ public:
 			if(idx >= (int)owner.raw.size()) {
 				owner.raw.resize(idx + 1);
 			}
-			
+
 			raw().exists = true;
 			raw().value = std::forward<TT>(new_value);
 			return Accessor<C>(owner, idx);
@@ -181,7 +214,7 @@ public:
 		Accessor_Base( Const<Dense_Map,C>& o, int i) :
 				key(i + o.get_offset()),
 				value(o.raw[i].value),
-				exists(i < (int)o.raw.size() && i >= 0 && o.raw[i].exists),
+				exists(i < (int)o.raw.size() && i >= 0 && o.raw[i].get_exists()),
 				owner(o),
 				idx(i) {}
 
@@ -255,7 +288,7 @@ private:
 
 	private:
 		inline void increment() {
-			do ++idx; while(idx < (int)owner.raw.size() && !raw().exists);
+			do ++idx; while(idx < (int)owner.raw.size() && !raw().get_exists());
 		}
 
 		inline void decrement() {
@@ -272,12 +305,12 @@ private:
 			DCHECK_LE(idx, owner.raw.size()) << "iterator constructor: index out of range";
 
 			// move forward if element is deleted
-			while(idx < (int)owner.raw.size() && !raw().exists) {
+			while(idx < (int)owner.raw.size() && !raw().get_exists()) {
 				++idx;
 			}
 		}
 
-		inline auto raw() const {
+		inline auto& raw() const {
 			return owner.raw[idx];
 		}
 
@@ -296,8 +329,25 @@ private:
 
 	// data
 private:
-	struct Node {
-		bool exists = false;
+
+	struct Node : internal::Add_Member_exists<bool(Flags & ERASABLE)> {
+
+		Node() = default;
+
+		template<class... Args>
+		Node(Args&&... args) : value(std::forward<Args>(args)...) {
+			if constexpr(bool(Flags & ERASABLE)) {
+				internal::Add_Member_exists<bool(Flags & ERASABLE)>::exists = true;
+			}
+		}
+
+		inline bool get_exists() const {
+			if constexpr(bool(Flags & ERASABLE)) {
+				return internal::Add_Member_exists<bool(Flags & ERASABLE)>::exists;
+			}
+			else return true;
+		}
+
 		Mapped_Type value;
 	};
 
@@ -310,6 +360,60 @@ private:
 
 	//int start_idx = 0; // TODO: to avoid performance issues when begin() is called inside a loop
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// BUILDER
+template<
+	class T,
+	Dense_Map_Flags FLAGS = internal::default__Dense_Map_Flags,
+	Dense_Map_Type TYPE = internal::default__Dense_Map_Type,
+	template<Const_Flag,class,class> class ACCESSOR_TEMPLATE = internal::Default__Dense_Map_Accessor_Template
+>
+class Dense_Map_Builder {
+private:
+	template<class TT, Dense_Map_Flags F, Dense_Map_Type TY, template<Const_Flag,class,class> class TMPL>
+	using _Dense_Map = Dense_Map<TT,F,TY,TMPL>;
+
+public:
+	using Dense_Map = _Dense_Map<T, FLAGS, TYPE, ACCESSOR_TEMPLATE>;
+
+	template<Dense_Map_Type NEW_TYPE>
+	using Type = Dense_Map_Builder<T, FLAGS, NEW_TYPE, ACCESSOR_TEMPLATE>;
+	
+	template<template<Const_Flag,class,class> class NEW_TMPL>
+	using Accessor_Template = Dense_Map_Builder<T, FLAGS, TYPE, NEW_TMPL>;
+
+
+	template<Dense_Map_Flags NEW_FLAGS>
+	using Flags           = Dense_Map_Builder<T, NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
+
+	template<Dense_Map_Flags NEW_FLAGS>
+	using Add_Flags       = Dense_Map_Builder<T, FLAGS |  NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
+
+	template<Dense_Map_Flags NEW_FLAGS>
+	using Remove_Flags    = Dense_Map_Builder<T, FLAGS & ~NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
+};
+
+
+
+
+
 
 
 
