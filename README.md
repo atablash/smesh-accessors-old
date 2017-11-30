@@ -17,10 +17,12 @@ This concept is present in the standard C++ library too, for pseudo-reference ob
 
 Where possible, data is exposed using member references instead of member functions, to minimize number of `()`s in code.
 
+```cpp
 	for(auto v : mesh.verts) {
 		cout << "vertex " << v.idx << "position:" << endl;
 		cout << v.pos << endl;
 	}
+```
 
 Note that accessors are constructed on demand and passed **by value**, like in the above `for`-loop.
 
