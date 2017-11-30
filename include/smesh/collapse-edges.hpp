@@ -31,13 +31,13 @@ void merge_verts(const VERT& a, const VERT& b, const typename VERT::Mesh::Scalar
 	// update polygons containing 'b': replace 'b'->'a'
 	if constexpr(VERT::Mesh::Has_Vert_Poly_Links) {
 		for(auto pv : b.poly_links) {
-			pv.idx = a.idx;
+			pv.key = a.key;
 		}
 
 		for(auto pv : b.poly_links) {
 
 			// we got degenerate triangle
-			if(pv.idx == pv.next().idx) {
+			if(pv.key == pv.next().key) {
 				if(pv.prev_edge().has_link && pv.prev_edge().prev_edge().has_link) {
 					auto e0 = pv.prev_edge().link();
 					auto e1 = pv.prev_edge().prev_edge().link();
@@ -46,9 +46,9 @@ void merge_verts(const VERT& a, const VERT& b, const typename VERT::Mesh::Scalar
 					if(e0.poly != e1.poly) e0.link(e1);
 				}
 
-				pv.poly.remove();
+				pv.poly.erase();
 			}
-			else if(pv.idx == pv.prev().idx) {
+			else if(pv.key == pv.prev().key) {
 				if(pv.next_edge().has_link && pv.next_edge().next_edge().has_link) {
 					auto e0 = pv.next_edge().link();
 					auto e1 = pv.next_edge().next_edge().link();
@@ -57,7 +57,7 @@ void merge_verts(const VERT& a, const VERT& b, const typename VERT::Mesh::Scalar
 					if(e0.poly != e1.poly) e0.link(e1);
 				}
 
-				pv.poly.remove();
+				pv.poly.erase();
 			}
 			else {
 				a.poly_links.add(pv);
@@ -67,7 +67,7 @@ void merge_verts(const VERT& a, const VERT& b, const typename VERT::Mesh::Scalar
 		b.poly_links.clear();
 	}
 
-	b.remove();
+	b.erase();
 }
 
 
@@ -112,7 +112,7 @@ auto clean_flat_surfaces_on_edges(MESH& mesh) {
 
 				auto ba = ab.link();
 
-				if(ba.next_vert().next_vert().idx == ab.next_vert().next_vert().idx) {
+				if(ba.next_vert().next_vert().key == ab.next_vert().next_vert().key) {
 
 					if(ab.next().has_link && ba.prev().has_link) {
 
@@ -140,8 +140,8 @@ auto clean_flat_surfaces_on_edges(MESH& mesh) {
 						}
 					}
 
-					ab.poly.remove();
-					ba.poly.remove();
+					ab.poly.erase();
+					ba.poly.erase();
 					r.num_polys_removed += 2;
 					change = true;
 					break; // skip the rest edges of this poly (it's removed and invalid now)
@@ -180,14 +180,14 @@ auto fast_collapse_edges(MESH& mesh, const typename MESH::Scalar& max_edge_lengt
 			for(auto e : p.edges) {
 				if(e.segment.trace().squaredNorm() <= max_edge_length * max_edge_length) {
 
-					auto weight_sum = get_v_weight(e.verts[0].idx) + get_v_weight(e.verts[1].idx);
+					auto weight_sum = get_v_weight(e.verts[0].key) + get_v_weight(e.verts[1].key);
 
-					merge_verts(e.verts[0], e.verts[1], (typename MESH::Scalar)get_v_weight(e.verts[1].idx) / weight_sum);
+					merge_verts(e.verts[0], e.verts[1], (typename MESH::Scalar)get_v_weight(e.verts[1].key) / weight_sum);
 					++r.num_edges_collapsed;
 
 					// if weights can be modified
 					if constexpr(std::is_lvalue_reference_v<decltype(get_v_weight(0))>) {
-						get_v_weight(e.verts[0].idx) += get_v_weight(e.verts[1].idx);
+						get_v_weight(e.verts[0].key) += get_v_weight(e.verts[1].key);
 					}
 
 					//if(r.num_edges_collapsed >= Dupa::get()) {
@@ -207,7 +207,7 @@ auto fast_collapse_edges(MESH& mesh, const typename MESH::Scalar& max_edge_lengt
 
 template<class MESH>
 auto fast_collapse_edges(MESH& mesh, const typename MESH::Scalar& max_edge_length) {
-	std::vector<int32_t> weights(mesh.verts.size_including_deleted(), 1);
+	std::vector<int32_t> weights(mesh.verts.domain_end(), 1);
 	return fast_collapse_edges(mesh, max_edge_length, [&weights](auto i) -> auto& { return weights[i]; });
 }
 

@@ -36,7 +36,7 @@ enum class Dense_Map_Flags {
 	ERASABLE = 0x0001
 };
 
-ENABLE_BITMASK_OPERATORS(Dense_Map_Flags);
+ENABLE_BITWISE_OPERATORS(Dense_Map_Flags);
 
 namespace {
 	constexpr auto ERASABLE = Dense_Map_Flags::ERASABLE;
@@ -54,6 +54,10 @@ namespace internal {
 	// for Node
 	template<bool> struct Add_Member_exists { bool exists = false; };
 	template<>     struct Add_Member_exists <false> {};
+
+	// for Dense_Map (can't use this...)
+	//template<bool, class T> struct Add_Member_context { T context = T(); };
+	//template<      class T> struct Add_Member_context <false,T> {};
 }
 
 
@@ -102,48 +106,127 @@ public:
 	using Mapped_Type = T;
 	static constexpr auto Flags = FLAGS;
 	using Container = std::conditional_t<TYPE == VECTOR, std::vector<Node>, std::deque<Node>>;
+
 	template<Const_Flag C> using Accessor = typename Accessor_Base<C>::Derived;
+
+	//friend Accessor<CONST>;
+	//friend Accessor<MUTAB>;
+
+private:
+	static constexpr bool has_context = !std::is_same_v<typename Accessor<MUTAB>::Context,void>;
+
+	// unfortunately storing uint8_t here
+	std::conditional_t<has_context, typename Accessor<MUTAB>::Context, uint8_t> context;
+
+
+
+	//
+	// helpers for creating accessors
+	//
+private:
+	template<Const_Flag C>
+	inline auto create_accessor(int idx) {
+		if constexpr(has_context) {
+			return Accessor<C>(context, *this, idx);
+		}
+		else {
+			return Accessor<C>(*this, idx);
+		}
+	}
+
+	template<Const_Flag C>
+	inline auto create_accessor(int idx) const {
+		if constexpr(has_context) {
+			return Accessor<C>(context, *this, idx);
+		}
+		else {
+			return Accessor<C>(*this, idx);
+		}
+	}
+
+
 
 
 public:
-	Dense_Map() {}
+	Dense_Map() {
+		static_assert(!has_context, "you have to provide context");
+	}
 
 	Dense_Map(int new_offset)
-		: internal::Add_Member_offset<TYPE == DEQUE>(new_offset) {}
+			: internal::Add_Member_offset<TYPE == DEQUE>(new_offset) {
+
+		static_assert(!has_context, "you have to provide context");
+	}
+
+	template<class CONTEXT>
+	Dense_Map(CONTEXT&& c) : context(std::forward<CONTEXT>(c)) {
+		static_assert(has_context, "doesn't use context");
+	}
+
+
+
 
 	decltype(auto) operator[](int key) {
-		return Accessor<MUTAB>(*this, key - get_offset());
+		return create_accessor<MUTAB>(key - get_offset());
 	}
 
 	decltype(auto) operator[](int key) const {
-		return Accessor<CONST>(*this, key - get_offset());
+		return create_accessor<CONST>(key - get_offset());
 	}
+
+
 
 	auto domain_begin() const {
 		return get_offset();
 	}
 
 	auto domain_end() const {
-		return get_offset() + raw.size();
+		return get_offset() + _raw.size();
 	}
 
+
+	auto empty() const {
+		return _raw.empty();
+	}
+
+	void reserve(int capacity) {
+		_raw.reserve(capacity);
+	}
+
+
+
+
 	template<class VAL>
-	inline void push_back(VAL&& val) {
-		raw.push_back(std::forward<VAL>(val));
+	inline auto push_back(VAL&& val) {
+		_raw.push_back(std::forward<VAL>(val));
+		return create_accessor<MUTAB>(_raw.size()-1);
 	}
 
 	template<class... Args>
-	void emplace_back(Args&&... args) {
-		raw.emplace_back(std::forward<Args>(args)... );
+	inline auto emplace_back(Args&&... args) {
+		_raw.emplace_back(std::forward<Args>(args)... );
+		return create_accessor<MUTAB>(_raw.size()-1);
 	}
 
 
-	auto begin()       {  return Iterator<MUTAB>(*this, get_offset());  }
-	auto end()         {  return Iterator<MUTAB>(*this, get_offset() + raw.size());  }
 
-	auto begin() const {  return Iterator<CONST>(*this, get_offset());  }
-	auto end()   const {  return Iterator<CONST>(*this, get_offset() + raw.size());  }
 
+
+	auto begin()       {  return Iterator<MUTAB>(*this, 0);  }
+	auto end()         {  return Iterator<MUTAB>(*this, _raw.size());  }
+
+	auto begin() const {  return Iterator<CONST>(*this, 0);  }
+	auto end()   const {  return Iterator<CONST>(*this, _raw.size());  }
+
+
+
+	auto& raw(int key) {
+		return _raw[key - get_offset()].value;
+	}
+
+	auto& raw(int key) const {
+		return _raw[key - get_offset()].value;
+	}
 
 
 
@@ -168,65 +251,80 @@ public:
 
 	public:
 		const int key;
-		Const<Mapped_Type,C>& value;
+		Const<Mapped_Type,C>& raw;
 
 		bool exists;
 
 		void erase() const {
-			DCHECK(key - owner.get_offset() < (int)owner.raw.size());
-			DCHECK(raw().exists);
-			raw().exists = false;
+			DCHECK(key - owner.get_offset() < (int)owner._raw.size());
+			DCHECK(_raw().exists);
+			_raw().exists = false;
 		}
 
 		operator Const<Mapped_Type,C>&() const {
-			return value;
+			return raw;
 		}
 
 		template<class TT>
 		auto operator=(TT&& new_value) const {
 
 			if constexpr(TYPE==DEQUE) {
-				if(owner.raw.empty()) {
+				if(owner._raw.empty()) {
 						owner.offset = key;
-						idx = 0;
+						_idx = 0;
 				}
 
-				if(idx < 0) {
-					owner.offset += idx;
+				if(_idx < 0) {
+					owner.offset += _idx;
 
-					//owner.raw.insert(owner.raw.begin(), std::max(diff, (int)owner.raw.size()*3/2), Node());
-					owner.raw.insert(owner.raw.begin(), -idx, Node());
-					idx = 0;
+					//owner._raw.insert(owner._raw.begin(), std::max(diff, (int)owner._raw.size()*3/2), Node());
+					owner._raw.insert(owner._raw.begin(), -_idx, Node());
+					_idx = 0;
 				}
 			}
 
-			if(idx >= (int)owner.raw.size()) {
-				owner.raw.resize(idx + 1);
+			if(_idx >= (int)owner._raw.size()) {
+				owner._raw.resize(_idx + 1);
 			}
 
-			raw().exists = true;
-			raw().value = std::forward<TT>(new_value);
-			return Accessor<C>(owner, idx);
+			_raw().exists = true;
+			_raw().value = std::forward<TT>(new_value);
+			return owner.template create_accessor<C>(_idx);
 		}
+
+
+
+		template<Const_Flag CC>
+		inline bool operator==(const Accessor_Base<CC>& o) const {
+			DCHECK_EQ(&owner, &o.owner);
+			return _idx == o._idx;
+		}
+
+		template<Const_Flag CC>
+		inline bool operator!=(const Accessor_Base<CC>& o) const {
+			return !(*this == o);
+		}
+
+
 
 	// store environment:
 	protected:
 		Accessor_Base( Const<Dense_Map,C>& o, int i) :
 				key(i + o.get_offset()),
-				value(o.raw[i].value),
-				exists(i < (int)o.raw.size() && i >= 0 && o.raw[i].get_exists()),
+				raw(o._raw[i].value),
+				exists(i < (int)o._raw.size() && i >= 0 && o._raw[i].get_exists()),
 				owner(o),
-				idx(i) {}
+				_idx(i) {}
 
 		auto operator()() const { return update(); }
-		auto update()     const { return Accessor<C>(owner, idx); }
+		auto update()     const { return owner.create_accessor<C>(_idx); }
 
-		auto& raw() const {
-			return owner.raw[idx];
+		auto& _raw() const {
+			return owner._raw[_idx];
 		}
 		
 		Const<Dense_Map,C>& owner;
-		mutable int idx; // TODO: remove for VECTOR, because key == idx
+		mutable int _idx; // TODO: remove for VECTOR, because key == idx
 	};
 
 
@@ -278,8 +376,8 @@ private:
 		bool operator!=(const Iterator<CC>& o) const {  return ! (*this == o);  }
 
 
-		      auto operator*()       {  return Accessor<C>(owner, idx);  }
-		const auto operator*() const {  return Accessor<C>(owner, idx);  }
+		      auto operator*()       {  return owner.template create_accessor<C>(idx);  }
+		const auto operator*() const {  return owner.template create_accessor<C>(idx);  }
 
 
 		// unable to implement if using accessors:
@@ -288,30 +386,30 @@ private:
 
 	private:
 		inline void increment() {
-			do ++idx; while(idx < (int)owner.raw.size() && !raw().get_exists());
+			do ++idx; while(idx < (int)owner._raw.size() && !_raw().get_exists());
 		}
 
 		inline void decrement() {
-			do --idx; while(idx > 0 && !raw().exists);
+			do --idx; while(idx > 0 && !_raw().exists);
 		}
 
 
 	private:
 		Iterator(Const<Dense_Map,C>& o, int i) :
-				owner(o), idx(i-o.get_offset()) {
+				owner(o), idx(i) {
 			DCHECK_GE(idx, 0) << "iterator constructor: index out of range";
 
 			// can be equal to container.size() for end() iterators
-			DCHECK_LE(idx, owner.raw.size()) << "iterator constructor: index out of range";
+			DCHECK_LE(idx, owner._raw.size()) << "iterator constructor: index out of range";
 
 			// move forward if element is deleted
-			while(idx < (int)owner.raw.size() && !raw().get_exists()) {
+			while(idx < (int)owner._raw.size() && !_raw().get_exists()) {
 				++idx;
 			}
 		}
 
-		inline auto& raw() const {
-			return owner.raw[idx];
+		inline auto& _raw() const {
+			return owner._raw[idx];
 		}
 
 	private:
@@ -351,7 +449,7 @@ private:
 		Mapped_Type value;
 	};
 
-	Container raw;
+	Container _raw;
 
 	inline int get_offset() const {
 		if constexpr(TYPE==DEQUE) return internal::Add_Member_offset<TYPE == DEQUE>::offset;
@@ -407,7 +505,7 @@ public:
 	using Add_Flags       = Dense_Map_Builder<T, FLAGS |  NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
 
 	template<Dense_Map_Flags NEW_FLAGS>
-	using Remove_Flags    = Dense_Map_Builder<T, FLAGS & ~NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
+	using Rem_Flags    = Dense_Map_Builder<T, FLAGS & ~NEW_FLAGS, TYPE, ACCESSOR_TEMPLATE>;
 };
 
 

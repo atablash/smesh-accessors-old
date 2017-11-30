@@ -61,7 +61,7 @@ struct has_member_##member                                                      
 
 
 
-#define ENABLE_BITMASK_OPERATORS(X)                                               \
+#define ENABLE_BITWISE_OPERATORS(X)                                               \
                                                                                   \
 constexpr X operator | (X lhs, X rhs)                                             \
 {                                                                                 \
@@ -96,7 +96,4 @@ constexpr X operator ~ (X x)                                                    
         ~ static_cast<underlying>(x)                                              \
     );                                                                            \
 }
-
-
-#define CHECK_FLAG(var,flag_name) bool(var & decltype(var)::flag_name)
 

@@ -183,7 +183,7 @@ MESH load_ply(FILE_NAME&& file_name) {
 		}
 	}
 	
-	LOG(INFO) << "loaded " << file_name << "   verts: " << mesh.verts.size() << "   polys: " << mesh.polys.size();
+	LOG(INFO) << "loaded " << file_name << "   verts: " << mesh.verts.domain_end() << "   polys: " << mesh.polys.domain_end();
 	
 	return mesh;
 }

@@ -288,6 +288,7 @@ TEST(Deque_dense_map, perf) {
 	}
 
 
+	LOG(INFO) << my_time << "s vs " << other_time << "s";
 
 
 	EXPECT_EQ(my_result, other_result);
@@ -606,6 +607,7 @@ TEST(Vector_dense_map, perf) {
 	}
 
 
+	LOG(INFO) << my_time << "s vs " << other_time << "s";
 
 
 	EXPECT_EQ(my_result, other_result);
@@ -639,7 +641,7 @@ TEST(Vector_dense_map, perf_noerase) {
 			auto t0 = steady_clock::now();
 
 
-			Dense_Map_Builder<int>::Type<VECTOR>::Remove_Flags<ERASABLE>::Dense_Map m;
+			Dense_Map_Builder<int>::Type<VECTOR>::Rem_Flags<ERASABLE>::Dense_Map m;
 
 			for(int i=0; i<elements; ++i) m.push_back(i);
 			
@@ -672,6 +674,7 @@ TEST(Vector_dense_map, perf_noerase) {
 	}
 
 
+	LOG(INFO) << my_time << "s vs " << other_time << "s";
 
 
 	EXPECT_EQ(my_result, other_result);

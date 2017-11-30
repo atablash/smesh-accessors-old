@@ -13,7 +13,7 @@ template<class MESH>
 bool has_degenerate_polys(const MESH& mesh) {
 	for(auto p : mesh.polys) {
 		for(auto pv : p.verts) {
-			if(pv.idx == pv.next().idx) return true;
+			if(pv.key == pv.next().key) return true;
 		}
 	}
 	return false;
@@ -39,12 +39,26 @@ struct Check_Solid_Result {
 };
 
 
+
+
+
+
+
+
 enum class Check_Solid_Flags {
 	NONE = 0,
 	ALLOW_HOLES = 0x0001
 };
 
-ENABLE_BITMASK_OPERATORS(Check_Solid_Flags)
+ENABLE_BITWISE_OPERATORS(Check_Solid_Flags);
+
+namespace {
+	static constexpr auto ALLOW_HOLES = Check_Solid_Flags::ALLOW_HOLES;
+}
+
+
+
+
 
 
 template<class MESH>
@@ -62,7 +76,7 @@ auto check_solid(const MESH& mesh, Check_Solid_Flags flags = Check_Solid_Flags::
 			r.failure = Check_Solid_Result::Failure::INVALID_EDGE_LINKS;
 			return r;
 		}
-		if(!CHECK_FLAG(flags, ALLOW_HOLES) && !has_all_edge_links(mesh)) {
+		if(!bool(flags & ALLOW_HOLES) && !has_all_edge_links(mesh)) {
 			r.failure = Check_Solid_Result::Failure::INVALID_EDGE_LINKS;
 			return r;
 		}
@@ -74,6 +88,8 @@ auto check_solid(const MESH& mesh, Check_Solid_Flags flags = Check_Solid_Flags::
 			return r;
 		}
 	}
+
+	(void)flags; // suppress unused warning
 
 	r.is_solid = true;
 	return r;

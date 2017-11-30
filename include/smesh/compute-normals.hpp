@@ -15,10 +15,10 @@ template< class MESH, class GET_V_NORMAL >
 void fast_compute_vert_normals( MESH& mesh,
 		const GET_V_NORMAL& get_v_normal ) {
 
-	std::vector<int> nums(mesh.verts.size_including_deleted());
+	std::vector<int> nums(mesh.verts.domain_end());
 
 	for(auto v : mesh.verts) {
-		get_v_normal(v.idx) = {0,0,0};
+		get_v_normal(v.key) = {0,0,0};
 	}
 
 	for(auto p : mesh.polys) {
@@ -28,15 +28,15 @@ void fast_compute_vert_normals( MESH& mesh,
 		normal.normalize();
 
 		for(auto pv : p.verts) {
-			get_v_normal(pv.vert.idx) += normal;
-			++nums[pv.vert.idx];
+			get_v_normal(pv.vert.key) += normal;
+			++nums[pv.vert.key];
 		}
 	}
 
 	for(auto v : mesh.verts) {
-		if(nums[v.idx] > 0) {
-			get_v_normal(v.idx) /= nums[v.idx];
-			get_v_normal(v.idx).normalize();
+		if(nums[v.key] > 0) {
+			get_v_normal(v.key) /= nums[v.key];
+			get_v_normal(v.key).normalize();
 		}
 	}
 }
@@ -72,10 +72,10 @@ template< class MESH, class GET_V_NORMAL >
 void compute_vert_normals( MESH& mesh,
 		const GET_V_NORMAL& get_v_normal ) {
 
-	std::vector<typename MESH::Scalar> weights(mesh.verts.size_including_deleted());
+	std::vector<typename MESH::Scalar> weights(mesh.verts.domain_end());
 
 	for(auto v : mesh.verts) {
-		get_v_normal(v.idx) = {0,0,0};
+		get_v_normal(v.key) = {0,0,0};
 	}
 
 	for(auto p : mesh.polys) {
@@ -83,15 +83,15 @@ void compute_vert_normals( MESH& mesh,
 
 		for(auto pv : p.verts) {
 			auto angle = compute_poly_vert_angle(pv);
-			get_v_normal(pv.vert.idx) += normal * angle;
-			weights[pv.vert.idx] += angle;
+			get_v_normal(pv.vert.key) += normal * angle;
+			weights[pv.vert.key] += angle;
 		}
 	}
 
 	for(auto v : mesh.verts) {
-		if(weights[v.idx] > 0) {
-			get_v_normal(v.idx) /= weights[v.idx];
-			get_v_normal(v.idx).normalize();
+		if(weights[v.key] > 0) {
+			get_v_normal(v.key) /= weights[v.key];
+			get_v_normal(v.key).normalize();
 		}
 	}
 }

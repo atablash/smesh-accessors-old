@@ -5,6 +5,8 @@
 #include <glog/logging.h>
 
 #include "common.hpp"
+#include "accessors-common.hpp"
+#include "storage.hpp"
 
 #include "segment.hpp"
 
@@ -19,31 +21,10 @@ namespace smesh {
 
 
 
-//
-// helper
-//
 
-namespace _smesh_detail {
 
-GENERATE_HAS_MEMBER(del);
 
-template<class T, class = std::enable_if_t<has_member_del<T>::value> >
-inline std::enable_if_t< has_member_del<T>::value, bool>
-is_deleted(const T& t)
-//requires requires(T t) { {t.del} -> bool }	// compile with concepts lite
-{
-	return t.del;
-}
 
-template<class T>
-//requires !requires(T t) { {t.del} -> bool }	// compile with concepts lite
-inline std::enable_if_t< ! has_member_del<T>::value, bool>
-is_deleted(const T& t)
-{
-	return false;
-}
-
-} // namespace _smesh_detail
 
 
 
@@ -55,60 +36,50 @@ is_deleted(const T& t)
 //
 enum class Smesh_Flags {
 	NONE = 0,
-	VERTS_LAZY_DEL =  0x0001,
-	POLYS_LAZY_DEL =  0x0002,
+	VERTS_ERASABLE =  0x0001,
+	POLYS_ERASABLE =  0x0002,
 	EDGE_LINKS =      0x0004,
 	VERT_POLY_LINKS = 0x0008
 };
 
 namespace {
-	constexpr auto VERTS_LAZY_DEL  = Smesh_Flags::VERTS_LAZY_DEL;
-	constexpr auto POLYS_LAZY_DEL  = Smesh_Flags::POLYS_LAZY_DEL;
+	constexpr auto VERTS_ERASABLE  = Smesh_Flags::VERTS_ERASABLE;
+	constexpr auto POLYS_ERASABLE  = Smesh_Flags::POLYS_ERASABLE;
 	constexpr auto EDGE_LINKS      = Smesh_Flags::EDGE_LINKS;
 	constexpr auto VERT_POLY_LINKS = Smesh_Flags::VERT_POLY_LINKS;
 };
 
 
-ENABLE_BITMASK_OPERATORS( Smesh_Flags );
+ENABLE_BITWISE_OPERATORS( Smesh_Flags );
 
 
 
 
 
 
-// optional `del` member
-template<bool> struct Add_Member_del { bool del = false; };
-template<>     struct Add_Member_del<false> {};
 
 
 
-// link to the other half-edge
-template<bool, class MESH> struct Add_Member_edge_link { typename MESH::H_Poly_Vert edge_link; };
-template<      class MESH> struct Add_Member_edge_link <false, MESH> {};
+namespace internal {
+
+	// link to the other half-edge
+	template<bool, class MESH> struct Add_Member_edge_link {
+		typename MESH::H_Poly_Vert edge_link;
+	};
+	template<      class MESH> struct Add_Member_edge_link <false, MESH> {};
 
 
 
-// link to the other half-edge
-// optim TODO: replace with small object optimization vector
-template<bool, class MESH> struct Add_Member_poly_links { std::unordered_set<typename MESH::H_Poly_Vert> poly_links; };
-template<      class MESH> struct Add_Member_poly_links <false, MESH> {};
+	// links from verts to poly-verts
+	// optim TODO: replace with small object optimization vector
+	template<bool, class MESH> struct Add_Member_poly_links { std::unordered_set<typename MESH::H_Poly_Vert> poly_links; };
+	template<      class MESH> struct Add_Member_poly_links <false, MESH> {};
+
+}
 
 
 
 
-
-
-enum class Const_Flag {
-	MUTAB = 0,
-	CONST = 1
-};
-
-namespace {
-	constexpr auto MUTAB = Const_Flag::MUTAB;
-	constexpr auto CONST = Const_Flag::CONST;
-};
-
-template<class T, Const_Flag c> using Const = std::conditional_t<c == CONST, const T, T>;
 
 
 
@@ -134,12 +105,12 @@ struct g_H_Poly_Vert{
 
 	template<class MESH>
 	auto operator()(MESH& mesh) const {
-		return typename MESH::VA_Poly_Vert (mesh, poly, vert);
+		return typename MESH::template A_Poly_Vert<MUTAB> (mesh, poly, vert);
 	}
 
 	template<class MESH>
 	auto operator()(const MESH& mesh) const {
-		return typename MESH::CA_Poly_Vert (mesh, poly, vert);
+		return typename MESH::template A_Poly_Vert<CONST> (mesh, poly, vert);
 	}
 
 
@@ -175,12 +146,12 @@ struct g_H_Poly_Edge {
 
 	template<class MESH>
 	auto operator()(MESH& mesh) const {
-		return typename MESH::VA_Poly_Edge (mesh, poly, edge);
+		return typename MESH::template A_Poly_Edge<MUTAB> (mesh, poly, edge);
 	}
 
 	template<class MESH>
 	auto operator()(const MESH& mesh) const {
-		return typename MESH::CA_Poly_Edge (mesh, poly, edge);
+		return typename MESH::template A_Poly_Edge<CONST> (mesh, poly, edge);
 	}
 
 
@@ -217,7 +188,7 @@ namespace {
 	};
 
 	constexpr Smesh_Flags _default__smesh_flags =
-		VERTS_LAZY_DEL | POLYS_LAZY_DEL |
+		VERTS_ERASABLE | POLYS_ERASABLE |
 		EDGE_LINKS | VERT_POLY_LINKS;
 }
 
@@ -238,7 +209,6 @@ class Smesh {
 public:
 	using Scalar = SCALAR;
 	using Pos = Eigen::Matrix<Scalar,3,1>;
-	using Idx = int32_t; // vertex index type
 
 private:
 	struct Void {};
@@ -263,44 +233,53 @@ public:
 
 
 
-private:
 
+
+
+
+
+
+
+
+
+
+
+	//
 	// internal raw structs for storage
+	//
+private:
 	struct Vert;
 	struct Poly;
 	struct Poly_Vert;
 
 
 
-private:
 
-	template<class A, class CONTAINER, Const_Flag, class EXTRA = Smesh&, class GET_A = A>
-	class Iterator;
 
-	template<class A, class CONTAINER, class EXTRA = Smesh&, class GET_A = A>
-	class Index_Iterator;
+
+
+
+
+
+
+
 
 public:
 	using H_Poly_Vert = g_H_Poly_Vert;
 	using H_Poly_Edge = g_H_Poly_Edge;
 
+
+
+
+
+
+
+
+
+
 public:
-	class A_Verts;
-	class A_Polys;
-
-
-	template<Const_Flag> class A_Vert;
-	template<Const_Flag C> using I_Vert = Index_Iterator< A_Vert<C>, std::vector<Vert>>;
-
-
-	template<Const_Flag> class A_Poly;
-	template<Const_Flag C> using I_Poly = Index_Iterator< A_Poly<C>, std::vector<Poly>>;
-
-
 	template<Const_Flag> class A_Poly_Verts;
 	template<Const_Flag> class A_Poly_Vert;
-	using VA_Poly_Vert = A_Poly_Vert<MUTAB>;
-	using CA_Poly_Vert = A_Poly_Vert<CONST>;
 
 
 	template<class A, Const_Flag C>
@@ -329,8 +308,6 @@ public:
 
 	template<Const_Flag> class A_Poly_Edges;
 	template<Const_Flag> class A_Poly_Edge;
-	using VA_Poly_Edge = A_Poly_Edge<MUTAB>;
-	using CA_Poly_Edge = A_Poly_Edge<CONST>;
 
 
 	template<Const_Flag C>
@@ -370,555 +347,100 @@ public:
 
 
 
-
-//
-// internal structure types
-//
-private:
-	struct Vert : public Vert_Props,
-			public Add_Member_del        <bool(Flags & VERTS_LAZY_DEL)>,
-			public Add_Member_poly_links <bool(Flags & VERT_POLY_LINKS), Smesh> {
-
-		Vert() {}
-		
-		template<class A_POS>
-		Vert(A_POS && a_pos) : pos( std::forward<A_POS>(a_pos) ) {}
-		
-		Pos pos = {0,0,0};
-	};
-	
-	struct Poly_Vert : public Poly_Vert_Props,
-			public Add_Member_edge_link<bool(Flags & EDGE_LINKS), Smesh> { // vertex and corresponidng edge
-		Idx idx; // vertex index
-	};
-	
-	struct Poly : public Poly_Props, public Add_Member_del<bool(Flags & POLYS_LAZY_DEL)> {
-		std::array<Poly_Vert, POLY_SIZE> verts;
-	};
 	
 	
 
-//
-// internal data
-//
-private:
-	std::vector<Vert> raw_verts;
-	int raw_verts_deleted = 0;
-
-	std::vector<Poly> raw_polys;
-	int raw_polys_deleted = 0;
 
 
-public:
-	Smesh() {}
-
-	Smesh(const Smesh& o) :
-		raw_verts        ( o.raw_verts ),
-		raw_verts_deleted( o.raw_verts_deleted ),
-		raw_polys        ( o.raw_polys ),
-		raw_polys_deleted( o.raw_polys_deleted ) {}
 
 
-	Smesh(Smesh&& o) :
-		raw_verts        ( std::move(o.raw_verts) ),
-		raw_verts_deleted( std::move(o.raw_verts_deleted) ),
-		raw_polys        ( std::move(o.raw_polys) ),
-		raw_polys_deleted( std::move(o.raw_polys_deleted) ) {}
+
+	
 
 
-	Smesh& operator=(const Smesh& o) {
-		raw_verts         = o.raw_verts;
-		raw_verts_deleted = o.raw_verts_deleted;
-		raw_polys         = o.raw_polys;
-		raw_polys_deleted = o.raw_polys_deleted;
 
-		return *this;
-	}
-
-
-	Smesh& operator=(Smesh&& o) {
-		raw_verts         = std::move(o.raw_verts);
-		raw_verts_deleted = std::move(o.raw_verts_deleted);
-		raw_polys         = std::move(o.raw_polys);
-		raw_polys_deleted = std::move(o.raw_polys_deleted);
-
-		return *this;
-	}
-
-
-private:
 	//
-	// iterator
-	// wraps T*, returns accessor A
+	// VERTS
 	//
-	// does not support 'del' flags. check older commits for that version
-	//
-	template<class A, class CONTAINER, Const_Flag C, class EXTRA, class GET_A>
-	class Iterator {
-		using Container_Iterator = std::conditional_t<C == CONST,
-			typename CONTAINER::const_iterator,
-			typename CONTAINER::iterator>;
-
-	public:
-		auto& operator++() {
-			increment();
-			return *this; }
-
-		auto operator++(int) {
-			auto old = *this;
-			increment();
-			return old; }
-
-		auto& operator--() {
-			decrement();
-			return *this; }
-
-		auto operator--(int) {
-			auto old = *this;
-			decrement();
-			return old; }
-
-
-		bool operator==(const Iterator& o) const {
-			return p == o.p; }
-
-		bool operator!=(const Iterator& o) const {
-			return ! (*this == o); }
-
-
-		template<class AA, Const_Flag CC, class EE, class GG>
-		bool operator==(const Iterator<AA,CONTAINER,CC,EE,GG>& o) const {
-			return p == o.p;
-		}
-
-		template<class AA, Const_Flag CC, class EE, class GG>
-		bool operator!=(const Iterator<AA,CONTAINER,CC,EE,GG>& o) const {
-			return ! (*this == o);
-		}
-
-
-		A operator*() const {
-			return GET_A(extra, *p);
-		}
-
-
-	private:
-		inline void increment() {
-			++p;
-		}
-
-		inline void decrement() {
-			--p;
-		}
-
-	private:
-		Iterator(const EXTRA& a_extra, const Container_Iterator& a_p) :
-			extra(a_extra), p(a_p) {}
-
-		EXTRA extra;
-		Container_Iterator p;
-
-		friend Smesh;
-	};
-	
-	
-
-
-
 
 private:
-	template<class A, class CONTAINER, class EXTRA, class GET_A>
-	class Index_Iterator {
+	template<Const_Flag C, class OWNER, class BASE>
+	class A_Vert_Template : public BASE {
 	public:
-		auto& operator++() {
-			increment();
-			return *this; }
+		using BASE::operator=;
 
-		auto operator++(int) {
-			auto old = *this;
-			increment();
-			return old; }
-
-		auto& operator--() {
-			decrement();
-			return *this; }
-
-		auto operator--(int) {
-			auto old = *this;
-			decrement();
-			return old; }
-
-
-		// warning! safe to compare only iterators to same container (optimization)
-		bool operator==(const Index_Iterator& o) const {
-			return idx == o.idx; }
-
-		bool operator!=(const Index_Iterator& o) const {
-			return ! (*this == o); }
-
-
-		template<class AA, class EE, class GG>
-		bool operator==(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
-			return idx == o.idx;
-		}
-
-		template<class AA, class EE, class GG>
-		bool operator!=(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
-			return ! (*this == o);
-		}
-
-
-		const A operator*() const {
-			// const cast to avoid defining a separate const_iterator
-			return GET_A(extra, idx);
-		}
-
-
-	private:
-		inline void increment() {
-			do ++idx; while(idx < (int)container.size() && _smesh_detail::is_deleted(container[idx]));
-		}
-
-		inline void decrement() {
-			// I believe decrementing `begin` is undefined anyway
-			do --idx; while(idx > 0 && _smesh_detail::is_deleted(container[idx]));
-		}
-
-
-	private:
-		Index_Iterator(const EXTRA& ex, const CONTAINER& co, int i) :
-				extra(ex), container(co), idx(i) {
-			DCHECK_GE(i, 0) << "iterator constructor: index out of range";
-
-			// can be equal to container.size() for end() iterators
-			DCHECK_LE(i, container.size()) << "iterator constructor: index out of range";
-
-			// move forward if element is deleted
-			while(idx < (int)container.size() && _smesh_detail::is_deleted(container[idx])) {
-				++idx;
-			}
-		}
-
-	private:
-		EXTRA extra;
-		const CONTAINER& container;
-		int idx;
-
-		friend Smesh;
-	};
-
-
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-//
-// ACCESSORS
-//
-////////////////////////////////////////////////////////////////////////////////
-public:
-
-
-	// does not have const flag - constness is decided by *this constness in this case
-	class A_Verts {
-	public:
-		auto add() {
-			raw().emplace_back();
-			return A_Vert<MUTAB> {*smesh, raw().back()};
-		}
-		
-		template<class POS_>
-		auto add(POS_&& pos) {
-			raw().emplace_back(pos);
-			return A_Vert<MUTAB> {*smesh, raw().back()};
-		}
-		
-		auto add(const Scalar& x, const Scalar& y, const Scalar& z) {
-			raw().emplace_back(Pos{x,y,z});
-			return A_Vert<MUTAB> (*smesh, raw().size()-1);
-		}
-		
-		void reserve(int n) {
-			raw().reserve(n);
-		}
-
-		int size_including_deleted() const {
-			return raw().size();
-		}
-
-		int size() const {
-			if constexpr(!bool(Flags & VERTS_LAZY_DEL)) return raw().size();
-
-			return raw().size() - smesh->raw_verts_deleted;
-		}
-
-		bool empty() const {
-			return size() == 0;
-		}
-
-
-		inline void check_idx(int idx) const {
-			DCHECK_GE(idx, 0) << "vertex index out of range";
-			DCHECK_LT(idx, (int)raw().size()) << "vertex index out of range";
-		}
-
-
-
-		auto operator[](int idx) {
-			check_idx(idx);
-			return A_Vert<MUTAB> {*smesh, idx};
-		}
-
-		auto operator[](int idx) const {
-			check_idx(idx);
-			return A_Vert<CONST> {*smesh, idx};
-		}
-
-		
-
-		// iterator
-		auto begin() {
-			return I_Vert<MUTAB> (*smesh, raw(), 0);
-		}
-
-		auto end() {
-			return I_Vert<MUTAB> (*smesh, raw(), raw().size());
-		}
-
-
-		// const iterator
-		auto begin() const {
-			return I_Vert<CONST> (*smesh, raw(), 0);
-		}
-
-		auto end() const {
-			return I_Vert<CONST> (*smesh, raw(), raw().size());
-		}
-
-	private:
-		auto& raw() const { return smesh->raw_verts; }
-
-
-	// store environment:
-	private:
-		// store mesh as pointer to make this object (and smesh) assignable
-		A_Verts(Smesh& a_smesh) : smesh(&a_smesh) {}
-		Smesh* smesh;
-		
-		friend Smesh;
-	};
-	
-	A_Verts verts = A_Verts(*this);
-	
-	
-	
-	
-	
-	// does not have const flag - constness is decided by *this constness in this case
-	class A_Polys {
-	public:
-
-		auto add(const Idx i0, const Idx i1, const Idx i2) {
-			Poly p;
-			p.verts[0].idx = i0;
-			p.verts[1].idx = i1;
-			p.verts[2].idx = i2;
-			raw().emplace_back(std::move(p));
-			return A_Poly<MUTAB>(*smesh, raw().size()-1);
-		}
-		
-		void reserve( const int n ) {
-			raw().reserve(n);
-		}
-
-		int size_including_deleted() const {
-			return raw().size();
-		}
-
-		int size() const {
-
-			if constexpr(!bool(Flags & POLYS_LAZY_DEL)) {
-				return raw().size();
-			}
-
-			return raw().size() - smesh->raw_polys_deleted;
-		}
-		
-		auto operator[]( const int idx ) {
-			DCHECK(0 <= idx && idx < (int)raw().size()) << "polygon index out of range";
-			return A_Poly<MUTAB> (*smesh, raw()[idx]);
-		}
-
-		auto operator[]( const int idx ) const {
-			DCHECK(0 <= idx && idx < (int)raw().size()) << "polygon index out of range";
-			return A_Poly<CONST> (*smesh, raw()[idx]);
-		}
-
-
-		// iterator
-		auto begin() {
-			return I_Poly<MUTAB> (*smesh, raw(), 0);
-		}
-
-		auto end() {
-			return I_Poly<MUTAB> (*smesh, raw(), raw().size());
-		}
-
-
-		// const iterator
-		auto begin() const {
-			return I_Poly<CONST> (*smesh, raw(), 0);
-		}
-
-		auto end() const {
-			return I_Poly<CONST> (*smesh, raw(), raw().size());
-		}
-
-	private:
-		auto& raw() const { return smesh->raw_polys; }
-
-		
-	// store environment:
-	private:
-		// store mesh as pointer to make this object (and smesh) assignable
-		A_Polys( Smesh& m ) : smesh(&m) {}
-		Smesh* smesh;
-		
-		friend Smesh;
-	};
-	
-	A_Polys polys = A_Polys(*this);
-	
-
-
-
-
-
-
-	template<Const_Flag C>
-	class A_Poly_Links {
-	public:
-		void add(const A_Poly_Vert<C>& pv) const {
-			DCHECK(smesh.raw_verts[vert].poly_links.find(pv.handle) == smesh.raw_verts[vert].poly_links.end())
-				<< "handle already in set";
-
-			smesh.raw_verts[vert].poly_links.insert(pv.handle);
-		}
-
-		int size() const {
-			return (int)smesh.raw_verts[vert].poly_links.size();
-		}
-
-		bool empty() const {
-			return size() == 0;
-		}
-
-		void clear() const {
-			smesh.raw_verts[vert].poly_links.clear();
-		}
-
-		auto operator[](int i) const {
-			const auto& poly_link = smesh.raw_verts[vert].poly_links[i];
-			return A_Poly_Vert<C>(smesh, poly_link.poly, poly_link.vert);
-		}
-
-
-		// iterator
-		auto begin() const {
-			return I_Poly_Link<C>(smesh, smesh.raw_verts[vert].poly_links.begin());
-		}
-
-		auto end() const {
-			return I_Poly_Link<C>(smesh, smesh.raw_verts[vert].poly_links.end());
-		}
-
-	// store environment:
-	private:
-		A_Poly_Links( Const<Smesh,C>& m, const int v ) : smesh(m), vert(v) {}
-		Const<Smesh,C>& smesh;
-		const int vert;
-		
-		friend Smesh;
-	};
-	
-	
-
-
-
-	
-	// accessor
-	template<Const_Flag C>
-	class A_Vert {
-	public:
 		using Mesh = Smesh;
+
+		using Context = Const<Smesh,C>&;
 
 		Const<Pos,C>& pos;
 		Const<Vert_Props,C>& props;
 
-		const int idx;
-
 		const A_Poly_Links<C> poly_links;
 
-		void remove() const {
-			DCHECK( !raw().del );
-			raw().del = true;
-			++smesh.raw_verts_deleted;
-		}
+		// add erase that erases neighbor polys too?
 
-	private:
-		inline auto& raw() const {
-			return smesh.raw_verts[idx];
-		}
+		A_Vert_Template( Context m, Const<OWNER,C>& o, const int i) : BASE(o, i),
+				pos( o.raw(i).pos ),
+				props( o.raw(i) ),
+				poly_links(m, i) {}
+	};
 
-	// store environment:
-	private:
-		A_Vert( Const<Smesh,C>& m, const int v)  :
-				pos( m.raw_verts[v].pos ),
-				props( m.raw_verts[v] ),
-				idx(v),
-				poly_links(m, v),
-				smesh(m) {
 
-			if constexpr(bool(Flags & VERTS_LAZY_DEL))
-				DCHECK(!m.raw_verts[v].del) << "vertex is already deleted";
-		}
 
-		auto operator()() const { return update(); }
-		auto update() const { return A_Vert(smesh, idx); }
-		
-		Const<Smesh,C>& smesh;
-		
+
+private:
+
+	using _Verts_Builder = typename Storage_Builder<Vert>
+		::template Accessor_Template<A_Vert_Template>;
+
+	using Verts_Storage_Base = typename std::conditional_t<bool(Flags & VERTS_ERASABLE),
+		typename _Verts_Builder::template Add_Flags<STORAGE_ERASABLE>,
+		typename _Verts_Builder::template Rem_Flags<STORAGE_ERASABLE>
+	> :: Storage;
+
+	class Verts_Storage : public Verts_Storage_Base {
+		Verts_Storage(Smesh& m) : Verts_Storage_Base(m) {}
 		friend Smesh;
 	};
 
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
+public:
+	Verts_Storage verts = Verts_Storage(*this);
 
 
 
 public:
 	template<Const_Flag C>
-	class A_Poly {
+	using A_Vert = typename Verts_Storage::template Accessor<C>;
+
+
+
+
+
+
+
+
+
+
+
+	//
+	// POLYS
+	//
+
+public:
+	template<Const_Flag C, class OWNER, class BASE>
+	class A_Poly_Template : public BASE {
 	public:
+		using BASE::operator=;
+		//using BASE::operator==;
+		//using BASE::operator!=;
+
+		using Context = Const<Smesh,C>&;
 
 		Const<Poly_Props,C>& props;
 
-		const Idx idx;
-
-		void remove() const {
-			DCHECK( !smesh.raw_polys[idx].del );
+		void erase() const {
+			BASE::erase();
 
 			// unlink edges
 			if constexpr(bool(Flags & EDGE_LINKS)) {
@@ -930,56 +452,181 @@ public:
 			// unlink vertices
 			if constexpr(bool(Flags & VERT_POLY_LINKS)) {
 				for(auto pv : verts) {
-					pv.vert.raw().poly_links.erase(pv.handle);
+					pv.vert.raw.poly_links.erase(pv.handle);
 				}
 			}
-
-			smesh.raw_polys[idx].del = true;
-			++smesh.raw_polys_deleted;
-		}
-
-		template<Const_Flag C2>
-		bool operator==(const A_Poly<C2>& other) const {
-			DCHECK_EQ(&smesh, &other.smesh) << "can only compare polys from the same mesh";
-			return idx == other.idx;
-		}
-
-		template<Const_Flag C2>
-		bool operator!=(const A_Poly<C2>& other) const {
-			return !(*this == other);
 		}
 
 		const A_Poly_Verts<C> verts;
 		const A_Poly_Edges<C> edges;
 
-	private:
-		auto& raw() const {
-			return smesh.raw_polys[idx];
-		}
 
-	private:
-		A_Poly( Const<Smesh,C>& m, const int p ) :
-				props(m.raw_polys[p]),
-				idx(p),
-				verts(m, p),
-				edges(m, p),
-				smesh(m) {
-
+		A_Poly_Template( Context m, Const<OWNER,C>& o, const int i ) : BASE ( o, i ),
+				props( o.raw(i) ),
+				verts( m, i ),
+				edges( m, i ) {
 			//DCHECK_NE(raw().verts[0].idx, raw().verts[1].idx) << "polygon is degenerate";
 			//DCHECK_NE(raw().verts[1].idx, raw().verts[2].idx) << "polygon is degenerate";
 			//DCHECK_NE(raw().verts[2].idx, raw().verts[0].idx) << "polygon is degenerate";
-
-			if constexpr(bool(Flags & POLYS_LAZY_DEL))
-				DCHECK( !m.raw_polys[p].del ) << "polygon is deleted";
 		}
+	};
 
-		auto operator()() const { return update(); }
-		auto update() const { return A_Poly(smesh, idx); }
 
-		Const<Smesh,C>& smesh;
 
+
+
+private:
+
+	using _Polys_Builder = typename Storage_Builder<Poly>
+		::template Accessor_Template<A_Poly_Template>;
+
+	using Polys_Storage_Base = typename std::conditional_t<bool(Flags & POLYS_ERASABLE),
+		typename _Polys_Builder::template Add_Flags<STORAGE_ERASABLE>,
+		typename _Polys_Builder::template Rem_Flags<STORAGE_ERASABLE>
+	> :: Storage;
+
+	class Polys_Storage : public Polys_Storage_Base {
+		Polys_Storage(Smesh& m) : Polys_Storage_Base(m) {}
 		friend Smesh;
 	};
+
+public:
+	Polys_Storage polys = Polys_Storage(*this);
+
+
+
+public:
+	template<Const_Flag C>
+	using A_Poly = typename Polys_Storage::template Accessor<C>;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	//
+	// internal raw structs
+	//
+private:
+	struct Vert : public Vert_Props,
+			public internal::Add_Member_poly_links <bool(Flags & VERT_POLY_LINKS), Smesh> {
+
+		Vert() {}
+		
+		template<class... Args>
+		Vert(Args&&... args) : pos( std::forward<Args>(args)... ) {}
+		
+		Pos pos = {0,0,0};
+	};
+	
+	struct Poly_Vert : public Poly_Vert_Props,
+			public internal::Add_Member_edge_link<bool(Flags & EDGE_LINKS), Smesh> { // vertex and corresponidng edge
+		typename Verts_Storage::Key key; // vertex index
+	};
+	
+	struct Poly : public Poly_Props {
+
+		Poly(
+				typename Verts_Storage::Key a,
+				typename Verts_Storage::Key b,
+				typename Verts_Storage::Key c) {
+
+			verts[0].key = a;
+			verts[1].key = b;
+			verts[2].key = c;
+		}
+
+		std::array<Poly_Vert, POLY_SIZE> verts;
+	};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+public:
+	template<Const_Flag C>
+	class A_Poly_Links {
+	public:
+		void add(const A_Poly_Vert<C>& pv) const {
+			DCHECK(smesh.verts.raw(vert).poly_links.find(pv.handle) == smesh.verts.raw(vert).poly_links.end())
+				<< "handle already in set";
+
+			smesh.verts.raw(vert).poly_links.insert(pv.handle);
+		}
+
+		int size() const {
+			return (int)smesh.verts.raw(vert).poly_links.size();
+		}
+
+		bool empty() const {
+			return size() == 0;
+		}
+
+		void clear() const {
+			smesh.verts.raw(vert).poly_links.clear();
+		}
+
+		auto operator[](int i) const {
+			const auto& poly_link = smesh.verts.raw(vert).poly_links[i];
+			return A_Poly_Vert<C>(smesh, poly_link.poly, poly_link.vert);
+		}
+
+
+		// iterator
+		auto begin() const {
+			return I_Poly_Link<C>(smesh, smesh.verts.raw(vert).poly_links.begin());
+		}
+
+		auto end() const {
+			return I_Poly_Link<C>(smesh, smesh.verts.raw(vert).poly_links.end());
+		}
+
+	// store environment:
+	private:
+		A_Poly_Links( Const<Smesh,C>& m, const int v ) : smesh(m), vert(v) {}
+		Const<Smesh,C>& smesh;
+		const int vert;
+		
+		friend Smesh;
+	};
+	
+
+
+
+
+
+
+
+
 
 
 
@@ -1012,11 +659,11 @@ public:
 		}
 
 		auto begin() const {
-			return I_Poly_Vert<C>( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
+			return I_Poly_Vert<C>( {smesh, poly}, smesh.polys.raw(poly).verts, 0 );
 		}
 
 		auto end() const {
-			return I_Poly_Vert<C>( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
+			return I_Poly_Vert<C>( {smesh, poly}, smesh.polys.raw(poly).verts, POLY_SIZE );
 		}
 
 	private:
@@ -1057,11 +704,11 @@ public:
 		}
 
 		auto begin() const {
-			return I_Poly_Edge<C>( {smesh, poly}, smesh.raw_polys[poly].verts, 0 );
+			return I_Poly_Edge<C>( {smesh, poly}, smesh.polys.raw(poly).verts, 0 );
 		}
 
 		auto end() const {
-			return I_Poly_Edge<C>( {smesh, poly}, smesh.raw_polys[poly].verts, POLY_SIZE );
+			return I_Poly_Edge<C>( {smesh, poly}, smesh.polys.raw(poly).verts, POLY_SIZE );
 		}
 
 	private:
@@ -1094,7 +741,9 @@ public:
 	class A_Poly_Vert {
 	public:
 		Const<Pos,C>& pos;
-		Const<Idx,C>& idx;
+
+		Const<typename Verts_Storage::Key,C>& key;
+
 		const decltype(H_Poly_Vert::vert) idx_in_poly;
 
 		const A_Vert<C> vert;
@@ -1142,7 +791,7 @@ public:
 
 	private:
 		auto& raw() const {
-			return mesh.raw_polys[handle.poly].verts[handle.vert];
+			return mesh.polys.raw(handle.poly).verts[handle.vert];
 		}
 
 		inline void check_idx(int i) const {
@@ -1152,12 +801,12 @@ public:
 
 	private:
 		A_Poly_Vert( Const<Smesh,C>& m, int p, decltype(H_Poly_Vert::vert) pv ) :
-				pos( m.raw_verts[ m.raw_polys[p].verts[pv].idx ].pos ),
-				idx(              m.raw_polys[p].verts[pv].idx ),
-				idx_in_poly(pv),
-				vert( m,          m.raw_polys[p].verts[pv].idx ),
-				poly(m,p),
-				props(            m.raw_polys[p].verts[pv] ),
+				pos( m.verts.raw( m.polys.raw(p).verts[pv].key ).pos ),
+				key(              m.polys.raw(p).verts[pv].key ),
+				idx_in_poly( pv ),
+				vert(    m.verts[ m.polys.raw(p).verts[pv].key ] ),
+				poly( m.polys[p] ),
+				props(            m.polys.raw(p).verts[pv] ),
 				handle{p,pv},
 				mesh(m) {
 
@@ -1192,7 +841,7 @@ public:
 		A_Poly_Edge link() const {
 			DCHECK(update().has_link) << "link is null";
 			const auto& l = raw().edge_link;
-			DCHECK_GE(l.poly, 0); DCHECK_LT(l.poly, mesh.raw_polys.size());
+			DCHECK_GE(l.poly, 0); DCHECK_LT(l.poly, mesh.polys.domain_end());
 			DCHECK_GE(l.vert, 0); DCHECK_LT(l.vert, 3);
 			return A_Poly_Edge( mesh, l.poly, l.vert );
 		}
@@ -1204,8 +853,8 @@ public:
 			DCHECK(poly != other_poly_edge.poly) << "can't link to the same poly";
 
 			// check if common vertices are shared
-			DCHECK_EQ(update().verts[0].idx, other_poly_edge().verts[1].idx);
-			DCHECK_EQ(update().verts[1].idx, other_poly_edge().verts[0].idx);
+			DCHECK_EQ(update().verts[0].key, other_poly_edge().verts[1].key);
+			DCHECK_EQ(update().verts[1].key, other_poly_edge().verts[0].key);
 
 			// 2-way
 			raw().edge_link = edge_to_vert(other_poly_edge.handle);
@@ -1274,7 +923,7 @@ public:
 
 	private:
 		auto& raw() const {
-			return mesh.raw_polys[handle.poly].verts[handle.edge];
+			return mesh.polys.raw(handle.poly).verts[handle.edge];
 		}
 
 
@@ -1285,14 +934,14 @@ public:
 	private:
 		A_Poly_Edge( Const<Smesh,C>& m, const int p, const int8_t pv ) :
 			mesh(m),
-			poly( m, p ),
+			poly( m.polys[p] ),
 			handle{p,pv},
-			verts({A_Vert<C>{m, m.raw_polys[p].verts[pv].idx},
-			       A_Vert<C>{m, m.raw_polys[p].verts[(pv+1)%POLY_SIZE].idx}}),
+			verts({m.verts[ m.polys.raw(p).verts[pv].key ],
+			       m.verts[ m.polys.raw(p).verts[(pv+1)%POLY_SIZE].key ]}),
 			segment(
-				m.raw_verts[ m.raw_polys[p].verts[pv].idx ].pos,
-				m.raw_verts[ m.raw_polys[p].verts[(pv+1)%POLY_SIZE].idx ].pos),
-			has_link(m.raw_polys[p].verts[pv].edge_link.poly != -1) {}
+				m.verts.raw( m.polys.raw(p).verts[pv].key ).pos,
+				m.verts.raw( m.polys.raw(p).verts[(pv+1)%POLY_SIZE].key ).pos),
+			has_link(m.polys.raw(p).verts[pv].edge_link.poly != -1) {}
 
 	public:
 		auto update() const { return A_Poly_Edge(mesh, handle.poly, handle.edge); }
@@ -1330,10 +979,10 @@ inline std::ostream& operator<<(std::ostream& s, const g_H_Poly_Edge& pe) {
 // ostream
 template<class SCALAR, Smesh_Flags FLAGS, class OPTIONS, Const_Flag C>
 std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, FLAGS, OPTIONS>::template A_Poly<C>& a_poly) {
-	stream << "poly(idx:" << a_poly.idx << ",indices:" <<
-		a_poly.verts[0].idx << "," <<
-		a_poly.verts[1].idx << "," <<
-		a_poly.verts[2].idx << ")";
+	stream << "poly(key:" << a_poly.key << ",indices:" <<
+		a_poly.verts[0].key << "," <<
+		a_poly.verts[1].key << "," <<
+		a_poly.verts[2].key << ")";
 	return stream;
 }
 
@@ -1361,7 +1010,8 @@ std::ostream& operator<<(std::ostream& stream, const typename Smesh<SCALAR, FLAG
 // BUILDER
 template<class SCALAR,
 	auto  FLAGS = _default__smesh_flags,
-	class PROPS = _Default__Smesh_Props>
+	class PROPS = _Default__Smesh_Props
+>
 class Smesh_Builder {
 private:
 	template<class S, Smesh_Flags F, class P>
@@ -1396,7 +1046,7 @@ public:
 	using Add_Flags       = Smesh_Builder<SCALAR, FLAGS |  NEW_FLAGS, PROPS>;
 
 	template<Smesh_Flags NEW_FLAGS>
-	using Remove_Flags    = Smesh_Builder<SCALAR, FLAGS & ~NEW_FLAGS, PROPS>;
+	using Rem_Flags    = Smesh_Builder<SCALAR, FLAGS & ~NEW_FLAGS, PROPS>;
 };
 
 

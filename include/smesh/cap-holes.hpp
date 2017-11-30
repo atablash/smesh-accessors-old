@@ -61,7 +61,7 @@ Cap_Hole_Result cap_hole(const EDGE& edge) {
 		++next;
 		if(next == perimeter.end()) next = perimeter.begin();
 
-		DCHECK_EQ(it->get(m).verts[1].idx, next->get(m).verts[0].idx) << "edges not adjacent";
+		DCHECK_EQ(it->get(m).verts[1].key, next->get(m).verts[0].key) << "edges not adjacent";
 
 		auto cands_it = cands.insert({get_score(it->get(m), next->get(m)), it});
 		where_cands.insert({*it, cands_it});
@@ -109,11 +109,11 @@ Cap_Hole_Result cap_hole(const EDGE& edge) {
 		auto next = curr; ++next;
 		if(next == perimeter.end()) next = perimeter.begin();
 
-		DCHECK_EQ(curr->get(m).verts[1].idx, next->get(m).verts[0].idx) << "edges not adjacent";
+		DCHECK_EQ(curr->get(m).verts[1].key, next->get(m).verts[0].key) << "edges not adjacent";
 
-		auto i0 = curr->get(m).verts[0].idx;
-		auto i1 = next->get(m).verts[1].idx;
-		auto i2 = curr->get(m).verts[1].idx;
+		auto i0 = curr->get(m).verts[0].key;
+		auto i1 = next->get(m).verts[1].key;
+		auto i2 = curr->get(m).verts[1].key;
 		// add cand, cand+1 poly
 		auto p = m.polys.add(i0, i1, i2);
 
@@ -140,8 +140,8 @@ Cap_Hole_Result cap_hole(const EDGE& edge) {
 		// insert new edge
 		auto new_edge = perimeter.insert(curr, p.edges[0].handle);
 
-		DCHECK_EQ(p.edges[0].verts[0].idx, prev->get(m).verts[1].idx) << "new_edge not adjacent";
-		DCHECK_EQ(p.edges[0].verts[1].idx, next->get(m).verts[1].idx) << "new_edge not adjacent";
+		DCHECK_EQ(p.edges[0].verts[0].key, prev->get(m).verts[1].key) << "new_edge not adjacent";
+		DCHECK_EQ(p.edges[0].verts[1].key, next->get(m).verts[1].key) << "new_edge not adjacent";
 
 		// erase 3 candidate polys from priority queue
 		del_cand(*prev);

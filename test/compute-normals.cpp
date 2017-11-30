@@ -80,7 +80,7 @@ TEST(Compute_vert_normals, cube_external) {
 	
 	const auto mesh = get_cube_mesh<Mesh>();
 
-	std::vector<Eigen::Matrix<double,3,1>> normals(mesh.verts.size_including_deleted());
+	std::vector<Eigen::Matrix<double,3,1>> normals(mesh.verts.domain_end());
 
 	compute_vert_normals(mesh, [&normals](int i) -> auto& { return normals[i]; });
 

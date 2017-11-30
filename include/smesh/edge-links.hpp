@@ -101,7 +101,7 @@ auto fast_compute_edge_links(MESH& mesh) {
 
 	for(auto p : mesh.polys) {
 		for(auto pe : p.edges) {
-			auto edge_key = std::pair(pe.verts[0].idx, pe.verts[1].idx);
+			auto edge_key = std::pair(pe.verts[0].key, pe.verts[1].key);
 
 			auto rev_edge_key = edge_key;
 			std::swap(rev_edge_key.first, rev_edge_key.second);

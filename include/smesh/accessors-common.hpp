@@ -1,5 +1,7 @@
 #pragma once
 
+#include <glog/logging.h>
+
 #include <functional>
 
 
@@ -39,6 +41,8 @@ namespace internal {
 		Index_Accessor_Template(Const<OWNER,C>& o, int i)
 			: BASE(o, i) {}
 
+		using Context = void;
+
 	public:
 		using BASE::operator=;
 
@@ -47,6 +51,164 @@ namespace internal {
 
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+// iterator
+// wraps CONTAINER::iterator, returns accessor A using GET_A(context&, raw_element&)
+//
+template<class A, class CONTAINER, Const_Flag C, class CONTEXT, class GET_A = A>
+class Iterator {
+	using Container_Iterator = std::conditional_t<C == CONST,
+		typename CONTAINER::const_iterator,
+		typename CONTAINER::iterator>;
+
+public:
+	auto& operator++() {
+		increment();
+		return *this; }
+
+	auto operator++(int) {
+		auto old = *this;
+		increment();
+		return old; }
+
+	auto& operator--() {
+		decrement();
+		return *this; }
+
+	auto operator--(int) {
+		auto old = *this;
+		decrement();
+		return old; }
+
+
+	bool operator==(const Iterator& o) const {
+		return p == o.p; }
+
+	bool operator!=(const Iterator& o) const {
+		return ! (*this == o); }
+
+
+	template<class AA, Const_Flag CC, class EE, class GG>
+	bool operator==(const Iterator<AA,CONTAINER,CC,EE,GG>& o) const {
+		return p == o.p;
+	}
+
+	template<class AA, Const_Flag CC, class EE, class GG>
+	bool operator!=(const Iterator<AA,CONTAINER,CC,EE,GG>& o) const {
+		return ! (*this == o);
+	}
+
+
+	A operator*() const {
+		return GET_A(context, *p);
+	}
+
+
+private:
+	inline void increment() { ++p; }
+	inline void decrement() { --p; }
+
+public:
+	Iterator(const CONTEXT& c, const Container_Iterator& a_p) :
+		context(c), p(a_p) {}
+
+private:
+	CONTEXT context;
+	Container_Iterator p;
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+//
+// iterates a CONTAINER and returns accessors A using GET_A(context, intex)
+//
+template<class A, class CONTAINER, class CONTEXT, class GET_A = A>
+class Index_Iterator {
+public:
+	auto& operator++() {
+		increment();
+		return *this; }
+
+	auto operator++(int) {
+		auto old = *this;
+		increment();
+		return old; }
+
+	auto& operator--() {
+		decrement();
+		return *this; }
+
+	auto operator--(int) {
+		auto old = *this;
+		decrement();
+		return old; }
+
+
+	// warning! safe to compare only iterators to same container (optimization)
+	bool operator==(const Index_Iterator& o) const {
+		return idx == o.idx; }
+
+	bool operator!=(const Index_Iterator& o) const {
+		return ! (*this == o); }
+
+
+	template<class AA, class EE, class GG>
+	bool operator==(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
+		return idx == o.idx;
+	}
+
+	template<class AA, class EE, class GG>
+	bool operator!=(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
+		return ! (*this == o);
+	}
+
+
+	const A operator*() const {
+		return GET_A(context, idx);
+	}
+
+
+private:
+	inline void increment() { ++idx; }
+	inline void decrement() { --idx; }
+
+public:
+	Index_Iterator(const CONTEXT& ex, const CONTAINER& co, int i) :
+			context(ex), container(co), idx(i) {
+		DCHECK_GE(i, 0) << "iterator constructor: index out of range";
+
+		// can be equal to container.size() for end() iterators
+		DCHECK_LE(i, container.size()) << "iterator constructor: index out of range";
+	}
+
+private:
+	CONTEXT context;
+	const CONTAINER& container;
+	int idx;
+};
 
 
 
@@ -122,86 +284,6 @@ private:
 
 
 
-
-template<class A, class CONTAINER, class EXTRA, class GET_A>
-class Index_Iterator_To_Accessor {
-public:
-	auto& operator++() {
-		increment();
-		return *this; }
-
-	auto operator++(int) {
-		auto old = *this;
-		increment();
-		return old; }
-
-	auto& operator--() {
-		decrement();
-		return *this; }
-
-	auto operator--(int) {
-		auto old = *this;
-		decrement();
-		return old; }
-
-
-	// warning! safe to compare only iterators to the same container (optimization)
-	bool operator==(const Index_Iterator& o) const {
-		return idx == o.idx; }
-
-	bool operator!=(const Index_Iterator& o) const {
-		return ! (*this == o); }
-
-
-	template<class AA, class EE, class GG>
-	bool operator==(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
-		return idx == o.idx;
-	}
-
-	template<class AA, class EE, class GG>
-	bool operator!=(const Index_Iterator<AA,CONTAINER,EE,GG>& o) const {
-		return ! (*this == o);
-	}
-
-
-	const A operator*() const {
-		// const cast to avoid defining a separate const_iterator
-		return GET_A(extra, idx);
-	}
-
-
-private:
-	inline void increment() {
-		do ++idx; while(idx < (int)container.size() && _smesh_detail::is_deleted(container[idx]));
-	}
-
-	inline void decrement() {
-		// I believe decrementing `begin` is undefined anyway
-		do --idx; while(idx > 0 && _smesh_detail::is_deleted(container[idx]));
-	}
-
-
-private:
-	Index_Iterator(const EXTRA& ex, const CONTAINER& co, int i) :
-			extra(ex), container(co), idx(i) {
-		DCHECK_GE(i, 0) << "iterator constructor: index out of range";
-
-		// can be equal to container.size() for end() iterators
-		DCHECK_LE(i, container.size()) << "iterator constructor: index out of range";
-
-		// move forward if element is deleted
-		while(idx < (int)container.size() && _smesh_detail::is_deleted(container[idx])) {
-			++idx;
-		}
-	}
-
-private:
-	EXTRA extra;
-	const CONTAINER& container;
-	int idx;
-
-	friend Smesh;
-};
 
 
 
