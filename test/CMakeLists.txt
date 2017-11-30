@@ -11,6 +11,7 @@ set(sources
 	links.cpp
 	cap-holes.cpp
 	collapse-edges.cpp
+	dense-map.cpp
 )
 
 if (SMESH_WITH_TINYPLY)
