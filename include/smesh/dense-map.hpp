@@ -11,12 +11,19 @@ namespace smesh {
 
 
 
-// forward declarations
-template<
-	class T,
-	template<Const_Flag,class,class> class ACCESSOR_TEMPLATE
->
-class Dense_Map;
+
+
+
+
+enum class Dense_Map_Type {
+	VECTOR,
+	DEQUE
+};
+
+namespace {
+	constexpr auto VECTOR = Dense_Map_Type::VECTOR;
+	constexpr auto DEQUE  = Dense_Map_Type::DEQUE;
+}
 
 
 
@@ -25,8 +32,10 @@ class Dense_Map;
 
 
 
-
-
+namespace internal {
+	template<bool> class Add_Member_offset {protected: int offset = 0; };
+	template<>     class Add_Member_offset <false> {};
+}
 
 
 
@@ -46,37 +55,43 @@ class Dense_Map;
 //
 template<
 	class T,
+	Dense_Map_Type TYPE = VECTOR,
 	template<Const_Flag,class,class> class ACCESSOR_TEMPLATE = internal::Index_Accessor_Template
 >
-class Dense_Map {
+class Dense_Map : public internal::Add_Member_offset<TYPE == DEQUE> {
+
 
 	// forward declarations
 	public: template<Const_Flag C> class Accessor_Base;
+	private: struct Node;
 
 
 public:
 	using Mapped_Type = T;
+	using Container = std::conditional_t<TYPE == VECTOR, std::vector<Node>, std::deque<Node>>;
 	template<Const_Flag C> using Accessor = typename Accessor_Base<C>::Derived;
 
 
 public:
 	Dense_Map() {}
-	Dense_Map(int new_offset) : offset(new_offset) {}
+
+	Dense_Map(int new_offset)
+		: internal::Add_Member_offset<TYPE == DEQUE>(new_offset) {}
 
 	decltype(auto) operator[](int key) {
-		return Accessor<MUTAB>(*this, key - offset);
+		return Accessor<MUTAB>(*this, key - get_offset());
 	}
 
 	decltype(auto) operator[](int key) const {
-		return Accessor<CONST>(*this, key - offset);
+		return Accessor<CONST>(*this, key - get_offset());
 	}
 
 	auto domain_begin() const {
-		return offset;
+		return get_offset();
 	}
 
 	auto domain_end() const {
-		return raw.size() + offset;
+		return get_offset() + raw.size();
 	}
 
 	template<class VAL>
@@ -90,11 +105,11 @@ public:
 	}
 
 
-	auto begin()       {  return Iterator<MUTAB>(*this, offset);  }
-	auto end()         {  return Iterator<MUTAB>(*this, offset + raw.size());  }
+	auto begin()       {  return Iterator<MUTAB>(*this, get_offset());  }
+	auto end()         {  return Iterator<MUTAB>(*this, get_offset() + raw.size());  }
 
-	auto begin() const {  return Iterator<CONST>(*this, offset);  }
-	auto end()   const {  return Iterator<CONST>(*this, offset + raw.size());  }
+	auto begin() const {  return Iterator<CONST>(*this, get_offset());  }
+	auto end()   const {  return Iterator<CONST>(*this, get_offset() + raw.size());  }
 
 
 
@@ -125,7 +140,7 @@ public:
 		bool exists;
 
 		void erase() const {
-			DCHECK(key - owner.offset < (int)owner.raw.size());
+			DCHECK(key - owner.get_offset() < (int)owner.raw.size());
 			DCHECK(raw().exists);
 			raw().exists = false;
 		}
@@ -136,24 +151,26 @@ public:
 
 		template<class TT>
 		auto operator=(TT&& new_value) const {
-			if(owner.raw.empty()) {
-				owner.offset = key;
-				idx = 0;
-			}
 
-			if(idx < 0) {
-				owner.offset += idx;
+			if constexpr(TYPE==DEQUE) {
+				if(owner.raw.empty()) {
+						owner.offset = key;
+						idx = 0;
+				}
 
-				//owner.raw.insert(owner.raw.begin(), std::max(diff, (int)owner.raw.size()*3/2), Node());
-				owner.raw.insert(owner.raw.begin(), -idx, Node());
-				idx = 0;
+				if(idx < 0) {
+					owner.offset += idx;
+
+					//owner.raw.insert(owner.raw.begin(), std::max(diff, (int)owner.raw.size()*3/2), Node());
+					owner.raw.insert(owner.raw.begin(), -idx, Node());
+					idx = 0;
+				}
 			}
 
 			if(idx >= (int)owner.raw.size()) {
-
-				//owner.raw.resize((key - owner.offset + 1) * 3/2);
 				owner.raw.resize(idx + 1);
 			}
+			
 			raw().exists = true;
 			raw().value = std::forward<TT>(new_value);
 			return Accessor<C>(owner, idx);
@@ -162,7 +179,7 @@ public:
 	// store environment:
 	protected:
 		Accessor_Base( Const<Dense_Map,C>& o, int i) :
-				key(i + o.offset),
+				key(i + o.get_offset()),
 				value(o.raw[i].value),
 				exists(i < (int)o.raw.size() && i >= 0 && o.raw[i].exists),
 				owner(o),
@@ -176,7 +193,7 @@ public:
 		}
 		
 		Const<Dense_Map,C>& owner;
-		mutable int idx;
+		mutable int idx; // TODO: remove for VECTOR, because key == idx
 	};
 
 
@@ -248,7 +265,7 @@ private:
 
 	private:
 		Iterator(Const<Dense_Map,C>& o, int i) :
-				owner(o), idx(i-o.offset) {
+				owner(o), idx(i-o.get_offset()) {
 			DCHECK_GE(idx, 0) << "iterator constructor: index out of range";
 
 			// can be equal to container.size() for end() iterators
@@ -283,8 +300,14 @@ private:
 		bool exists = false;
 		Mapped_Type value;
 	};
-	std::deque<Node> raw;
-	int offset = 0; // to support negative indices
+
+	Container raw;
+
+	inline int get_offset() const {
+		if constexpr(TYPE==DEQUE) return internal::Add_Member_offset<TYPE == DEQUE>::offset;
+		else return 0;
+	}
+
 	//int start_idx = 0; // TODO: to avoid performance issues when begin() is called inside a loop
 };
 
