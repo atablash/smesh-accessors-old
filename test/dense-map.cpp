@@ -233,7 +233,7 @@ TEST(Deque_dense_map, const_test) {
 
 
 
-TEST(Deque_dense_map, perf) {
+TEST(Performance, Deque_dense_map) {
 	const int iters = 200;
 	const int elements = 100'000;
 
@@ -552,7 +552,7 @@ TEST(Vector_dense_map, const_test) {
 
 
 
-TEST(Vector_dense_map, perf) {
+TEST(Performance, Vector_dense_map) {
 	const int iters = 200;
 	const int elements = 100'000;
 
@@ -624,7 +624,7 @@ TEST(Vector_dense_map, perf) {
 
 
 
-TEST(Vector_dense_map, perf_noerase) {
+TEST(Performance, Vector_dense_map_noerase) {
 	const int iters = 200;
 	const int elements = 100'000;
 

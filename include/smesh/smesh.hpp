@@ -936,8 +936,10 @@ public:
 			mesh(m),
 			poly( m.polys[p] ),
 			handle{p,pv},
-			verts({m.verts[ m.polys.raw(p).verts[pv].key ],
-			       m.verts[ m.polys.raw(p).verts[(pv+1)%POLY_SIZE].key ]}),
+			verts{{
+				m.verts[ m.polys.raw(p).verts[pv].key ],
+			    m.verts[ m.polys.raw(p).verts[(pv+1)%POLY_SIZE].key ]
+			}},
 			segment(
 				m.verts.raw( m.polys.raw(p).verts[pv].key ).pos,
 				m.verts.raw( m.polys.raw(p).verts[(pv+1)%POLY_SIZE].key ).pos),

@@ -376,8 +376,8 @@ private:
 		bool operator!=(const Iterator<CC>& o) const {  return ! (*this == o);  }
 
 
-		      auto operator*()       {  return owner.template create_accessor<C>(idx);  }
-		const auto operator*() const {  return owner.template create_accessor<C>(idx);  }
+		auto operator*()       {  return owner.template create_accessor<C>(idx);  }
+		auto operator*() const {  return owner.template create_accessor<C>(idx);  }
 
 
 		// unable to implement if using accessors:
