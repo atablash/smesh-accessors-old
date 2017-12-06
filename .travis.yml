@@ -1,32 +1,58 @@
 dist: trusty
 sudo: required # for building gtest
 
-language: cpp
-compiler: g++
 
-addons:
-  apt:
-    sources:
-      # C++17
-      - ubuntu-toolchain-r-test
-    packages:
-      # C++17
-      - g++-7
-      # dependencies
-      - libgoogle-glog-dev
-      - libgtest-dev
-      - libeigen3-dev
-      
+language: cpp
+
+
+matrix:
+  include:
+
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+          packages:
+            - g++-7
+            # dependencies
+            - libgoogle-glog-dev
+            - libgtest-dev
+            - libeigen3-dev
+      env:
+        - MATRIX_EVAL="export CC=gcc-7 && export CXX=g++-7"
+
+
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-trusty-5.0
+            - ubuntu-toolchain-r-test # libstdc++-7-dev
+          packages:
+            - clang-5.0
+            - libstdc++-7-dev
+            # dependencies
+            - libgoogle-glog-dev
+            - libgtest-dev
+            - libeigen3-dev
+      env:
+        - MATRIX_EVAL="export CC=clang-5.0 && export CXX=clang++-5.0"
+
+
+
+
+
 before_install:
-  - export CC=gcc-7
-  - export CXX=g++-7
+  - eval "${MATRIX_EVAL}"
 
 install:
   - travis/fix-gtest.sh
 
+
 script:
   # build
-  - cmake -DSMESH_BUILD_TESTS=ON .
+  - cmake -D SMESH_BUILD_TESTS=ON .
   - make VERBOSE=1
   - ctest --verbose
 
