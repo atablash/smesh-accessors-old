@@ -102,7 +102,7 @@ message("** Build type: " ${CMAKE_BUILD_TYPE})
 message("** Build tests: " ${SMESH_BUILD_TESTS})
 #message("** libvot version: " ${LIBVOT_VERSION})
 #message("** Build shared libs: " ${LIBVOT_BUILD_SHARED})
-#message("** Build docs: " ${LIBVOT_BUILD_DOC})
+#message("** Build docs: " ${SMESH_BUILD_DOC})
 message("\n")
 
 
