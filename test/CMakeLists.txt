@@ -11,12 +11,11 @@ set(sources
 	links.cpp
 	cap-holes.cpp
 	collapse-edges.cpp
-	dense-map.cpp
 )
 
 if (SMESH_WITH_TINYPLY)
-	set(sources ${sources} ../third-party/tinyply.cpp)
-	add_definitions(-Wno-unused-parameter)
+	set(sources ${sources} ../third-party/tinyply/source/tinyply.cpp)
+	#add_definitions(-Wno-unused-parameter)
 endif (SMESH_WITH_TINYPLY)
 
 # make #include <smesh/...> work
@@ -25,7 +24,8 @@ include_directories( # SYSTEM
 )
 
 include_directories( SYSTEM
-	../third-party
+	../third-party/tinyply/source
+	../third-party/salgo/include
 )
 
 

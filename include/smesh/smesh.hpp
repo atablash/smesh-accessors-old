@@ -4,13 +4,12 @@
 
 #include <glog/logging.h>
 
+#include <salgo/accessors-common.hpp>
+#include <salgo/storage.hpp>
+#include <salgo/segment.hpp>
+
 #include "common.hpp"
-#include "accessors-common.hpp"
-#include "storage.hpp"
 
-#include "segment.hpp"
-
-//#include <atablash/member-detector.hpp>
 
 
 #include <unordered_set>
@@ -19,8 +18,7 @@
 
 namespace smesh {
 
-
-
+using namespace salgo;
 
 
 
@@ -1029,6 +1027,8 @@ private:
 public:
 	using Smesh = _Smesh<SCALAR, FLAGS, PROPS>;
 
+	//
+
 	template<class NEW_VERT_PROPS>
 	using Vert_Props      = Smesh_Builder<SCALAR, FLAGS,
 		Props<NEW_VERT_PROPS, typename PROPS::Poly, typename PROPS::Poly_Vert>>;
@@ -1040,6 +1040,8 @@ public:
 	template<class NEW_POLY_VERT_PROPS>
 	using Poly_Vert_Props = Smesh_Builder<SCALAR, FLAGS,
 		Props<typename PROPS::Vert, typename PROPS::Poly, NEW_POLY_VERT_PROPS>>;
+
+
 
 	template<Smesh_Flags NEW_FLAGS>
 	using Flags           = Smesh_Builder<SCALAR, NEW_FLAGS, PROPS>;

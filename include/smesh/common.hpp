@@ -16,30 +16,30 @@
 #include <iomanip>     // To use 'std::boolalpha'.
 
 
-#define GENERATE_HAS_MEMBER(member)                                               \
-                                                                                  \
-template < class T >                                                              \
-class HasMember_##member                                                          \
-{                                                                                 \
-    struct Fallback { int member; };                                                     \
-    struct Derived : T, Fallback { };                                               \
-                                                                                    \
-    template<typename U, U> struct Check;                                           \
-                                                                                    \
-    typedef char ArrayOfOne[1];                                                     \
-    typedef char ArrayOfTwo[2];                                                     \
-                                                                                    \
+#define GENERATE_HAS_MEMBER(member)                                                \
+                                                                                   \
+template < class T >                                                               \
+class HasMember_##member                                                           \
+{                                                                                  \
+    struct Fallback { int member; };                                               \
+    struct Derived : T, Fallback { };                                              \
+                                                                                   \
+    template<typename U, U> struct Check;                                          \
+                                                                                   \
+    typedef char ArrayOfOne[1];                                                    \
+    typedef char ArrayOfTwo[2];                                                    \
+                                                                                   \
     template<typename U> static ArrayOfOne & func(Check<int Fallback::*, &U::member> *); \
-    template<typename U> static ArrayOfTwo & func(...);                             \
-  public:                                                                           \
-    typedef HasMember_##member type;                                                        \
-    enum { value = sizeof(func<Derived>(0)) == 2 };                                 \
-};                                                                                \
-                                                                                  \
-template < class T >                                                              \
-struct has_member_##member                                                        \
-: public std::integral_constant<bool, HasMember_##member<T>::value>              \
-{                                                                                 \
+    template<typename U> static ArrayOfTwo & func(...);                            \
+  public:                                                                          \
+    typedef HasMember_##member type;                                               \
+    enum { value = sizeof(func<Derived>(0)) == 2 };                                \
+};                                                                                 \
+                                                                                   \
+template < class T >                                                               \
+struct has_member_##member                                                         \
+: public std::integral_constant<bool, HasMember_##member<T>::value>                \
+{                                                                                  \
 };
 
 
