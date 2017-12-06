@@ -1,6 +1,6 @@
 [submodule "third-party/salgo"]
 	path = third-party/salgo
-	url = git@github.com:atablash/salgo.git
+	url = https://github.com/atablash/salgo.git
 [submodule "third-party/tinyply"]
 	path = third-party/tinyply
-	url = https://github.com/ddiakopoulos/tinyply.git
+	url = https://github.com/atablash/tinyply.git
