@@ -18,11 +18,11 @@
 // if links are present, this effectively collapses edge (if present)
 //
 template<class VERT>
-void merge_verts(const VERT& a, const VERT& b, const typename VERT::Mesh::Scalar& alpha) {
+void merge_verts(VERT& a, VERT& b, const typename VERT::Mesh::Scalar& alpha) {
 
 	// LOG(INFO) << "merge_verts(" << a.idx << ", " << b.idx << ", alpha:" << alpha << ")";
 
-	a.pos = a.pos * (1-alpha)  +  b.pos * alpha;
+	a.pos = a.pos() * (1-alpha)  +  b.pos() * alpha;
 
 	if constexpr(VERT::Mesh::Has_Vert_Props) {
 		a.props = a.props * (1-alpha)  +  b.props * alpha;

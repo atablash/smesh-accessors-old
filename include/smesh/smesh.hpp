@@ -5,6 +5,7 @@
 #include <glog/logging.h>
 
 #include <salgo/accessors-common.hpp>
+//#include <salgo/proxy.hpp>
 #include <salgo/storage.hpp>
 #include <salgo/segment.hpp>
 
@@ -19,6 +20,7 @@
 namespace smesh {
 
 using namespace salgo;
+
 
 
 
@@ -298,7 +300,7 @@ public:
 
 	// extra is Smesh& and int (poly index)
 	template<Const_Flag C>
-	using I_Poly_Vert = Index_Iterator< A_Poly_Vert<C>, std::array<Poly_Vert, POLY_SIZE>,
+	using I_Poly_Vert = salgo::internal::Index_Iterator< A_Poly_Vert<C>, std::array<Poly_Vert, POLY_SIZE>,
 		std::pair<Const<Smesh,C>&,int>,
 		Get_A_Double_Idx<A_Poly_Vert<C>, C>>;
 
@@ -309,7 +311,7 @@ public:
 
 
 	template<Const_Flag C>
-	using I_Poly_Edge = Index_Iterator< A_Poly_Edge<C>, std::array<Poly_Vert, POLY_SIZE>,
+	using I_Poly_Edge = salgo::internal::Index_Iterator< A_Poly_Edge<C>, std::array<Poly_Vert, POLY_SIZE>,
 		std::pair<Const<Smesh,C>&, int>,
 		Get_A_Double_Idx<A_Poly_Edge<C>, C>>;
 
@@ -337,7 +339,7 @@ public:
 	};
 
 	template<Const_Flag C>
-	using I_Poly_Link = Iterator< A_Poly_Vert<C>, std::unordered_set<H_Poly_Vert>, C,
+	using I_Poly_Link = salgo::internal::Iterator< A_Poly_Vert<C>, std::unordered_set<H_Poly_Vert>, C,
 		Const<Smesh,C>&, A_Poly_Vert_From_Poly_Link_Iter<C> >;
 
 
@@ -362,23 +364,23 @@ public:
 	//
 
 private:
-	template<Const_Flag C, class OWNER, class BASE>
+	template<Const_Flag C, class BASE>
 	class A_Vert_Template : public BASE {
 	public:
 		using BASE::operator=;
+		using typename BASE::Owner;
+		using Context = Const<Smesh,C>&;
 
 		using Mesh = Smesh;
 
-		using Context = Const<Smesh,C>&;
+		Proxy<Pos,C> pos;
+		Proxy<Vert_Props,C> props;
 
-		Const<Pos,C>& pos;
-		Const<Vert_Props,C>& props;
-
-		const A_Poly_Links<C> poly_links;
+		A_Poly_Links<C> poly_links;
 
 		// add erase that erases neighbor polys too?
 
-		A_Vert_Template( Context m, Const<OWNER,C>& o, const int i) : BASE(o, i),
+		A_Vert_Template( Context m, Const<Owner,C>& o, const int i) : BASE(o, i),
 				pos( o.raw(i).pos ),
 				props( o.raw(i) ),
 				poly_links(m, i) {}
@@ -389,13 +391,13 @@ private:
 
 private:
 
-	using _Verts_Builder = typename Storage_Builder<Vert>
-		::template Accessor_Template<A_Vert_Template>;
+	using _Verts_Builder = typename Storage< Vert >::BUILDER
+		::template Accessor_Template< A_Vert_Template >;
 
 	using Verts_Storage_Base = typename std::conditional_t<bool(Flags & VERTS_ERASABLE),
-		typename _Verts_Builder::template Add_Flags<STORAGE_ERASABLE>,
-		typename _Verts_Builder::template Rem_Flags<STORAGE_ERASABLE>
-	> :: Storage;
+		typename _Verts_Builder::Erasable,
+		typename _Verts_Builder::Not_Erasable
+	> :: BUILD;
 
 	class Verts_Storage : public Verts_Storage_Base {
 		Verts_Storage(Smesh& m) : Verts_Storage_Base(m) {}
@@ -426,18 +428,19 @@ public:
 	//
 
 public:
-	template<Const_Flag C, class OWNER, class BASE>
+	template<Const_Flag C, class BASE>
 	class A_Poly_Template : public BASE {
 	public:
 		using BASE::operator=;
 		//using BASE::operator==;
 		//using BASE::operator!=;
 
+		using typename BASE::Owner;
 		using Context = Const<Smesh,C>&;
 
-		Const<Poly_Props,C>& props;
+		Proxy<Poly_Props,C> props;
 
-		void erase() const {
+		void erase() {
 			BASE::erase();
 
 			// unlink edges
@@ -450,16 +453,16 @@ public:
 			// unlink vertices
 			if constexpr(bool(Flags & VERT_POLY_LINKS)) {
 				for(auto pv : verts) {
-					pv.vert.raw.poly_links.erase(pv.handle);
+					pv.vert.val().poly_links.erase(pv.handle);
 				}
 			}
 		}
 
-		const A_Poly_Verts<C> verts;
-		const A_Poly_Edges<C> edges;
+		Const<A_Poly_Verts<C>,C> verts;
+		Const<A_Poly_Edges<C>,C> edges;
 
 
-		A_Poly_Template( Context m, Const<OWNER,C>& o, const int i ) : BASE ( o, i ),
+		A_Poly_Template( Context m, Const<Owner,C>& o, const int i ) : BASE ( o, i ),
 				props( o.raw(i) ),
 				verts( m, i ),
 				edges( m, i ) {
@@ -475,13 +478,13 @@ public:
 
 private:
 
-	using _Polys_Builder = typename Storage_Builder<Poly>
+	using _Polys_Builder = typename Storage<Poly>::BUILDER
 		::template Accessor_Template<A_Poly_Template>;
 
 	using Polys_Storage_Base = typename std::conditional_t<bool(Flags & POLYS_ERASABLE),
-		typename _Polys_Builder::template Add_Flags<STORAGE_ERASABLE>,
-		typename _Polys_Builder::template Rem_Flags<STORAGE_ERASABLE>
-	> :: Storage;
+		typename _Polys_Builder::Erasable,
+		typename _Polys_Builder::Not_Erasable
+	> :: BUILD;
 
 	class Polys_Storage : public Polys_Storage_Base {
 		Polys_Storage(Smesh& m) : Polys_Storage_Base(m) {}
@@ -744,11 +747,11 @@ public:
 
 		const decltype(H_Poly_Vert::vert) idx_in_poly;
 
-		const A_Vert<C> vert;
+		A_Vert<C> vert;
 
-		const A_Poly<C> poly;
+		A_Poly<C> poly;
 
-		Const<Poly_Vert_Props,C>& props;
+		Proxy<Poly_Vert_Props,C> props;
 
 
 		A_Poly_Vert<C> prev() const {
@@ -908,11 +911,11 @@ public:
 
 		Const<Smesh,C>& mesh;
 
-		const A_Poly<C> poly;
+		A_Poly<C> poly;
 
 		const H_Poly_Edge handle;
 
-		const std::array<const A_Vert<C>, 2> verts;
+		std::array< A_Vert<C>, 2 > verts;
 
 		const Segment<typename Mesh::Scalar, 3> segment;
 

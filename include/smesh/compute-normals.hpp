@@ -45,7 +45,7 @@ void fast_compute_vert_normals( MESH& mesh,
 
 template<class MESH>
 void fast_compute_vert_normals( MESH& mesh ) {
-	fast_compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
+	fast_compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props().normal; } );
 }
 
 
@@ -100,5 +100,5 @@ void compute_vert_normals( MESH& mesh,
 
 template<class MESH>
 void compute_vert_normals( MESH& mesh ) {
-	compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props.normal; } );
+	compute_vert_normals( mesh, [&mesh](int iv) -> auto& { return mesh.verts[iv].props().normal; } );
 }

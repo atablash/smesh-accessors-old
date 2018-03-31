@@ -1,11 +1,12 @@
+#include "common.hpp"
+
 #include <smesh/smesh.hpp>
 #include <smesh/compute-normals.hpp>
+//#include <smesh/io.hpp>
 
 #include <gtest/gtest.h>
 
-//#include <smesh/io.hpp>
 
-#include "common.hpp"
 
 using namespace smesh;
 
@@ -30,14 +31,14 @@ TEST(Fast_compute_vert_normals, cube) {
 			for(int z=0; z<2; ++z) {
 				int idx = x*4 + y*2 + z;
 
-				if(x == 0) EXPECT_LT(mesh.verts[idx].props.normal[0], -0.1);
-				else EXPECT_GT(mesh.verts[idx].props.normal[0], 0.1);
+				if(x == 0) EXPECT_LT(mesh.verts[idx].props().normal[0], -0.1);
+				else EXPECT_GT(mesh.verts[idx].props().normal[0], 0.1);
 
-				if(y == 0) EXPECT_LT(mesh.verts[idx].props.normal[1], -0.1);
-				else EXPECT_GT(mesh.verts[idx].props.normal[1], 0.1);
+				if(y == 0) EXPECT_LT(mesh.verts[idx].props().normal[1], -0.1);
+				else EXPECT_GT(mesh.verts[idx].props().normal[1], 0.1);
 
-				if(z == 0) EXPECT_LT(mesh.verts[idx].props.normal[2], -0.1);
-				else EXPECT_GT(mesh.verts[idx].props.normal[2], 0.1);
+				if(z == 0) EXPECT_LT(mesh.verts[idx].props().normal[2], -0.1);
+				else EXPECT_GT(mesh.verts[idx].props().normal[2], 0.1);
 			}
 		}
 	}
@@ -58,14 +59,14 @@ TEST(Compute_vert_normals, cube) {
 			for(int z=0; z<2; ++z) {
 				int idx = x*4 + y*2 + z;
 
-				if(x == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props.normal[0]);
-				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props.normal[0]);
+				if(x == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props().normal[0]);
+				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props().normal[0]);
 
-				if(y == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props.normal[1]);
-				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props.normal[1]);
+				if(y == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props().normal[1]);
+				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props().normal[1]);
 
-				if(z == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props.normal[2]);
-				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props.normal[2]);
+				if(z == 0) EXPECT_DOUBLE_EQ(-s, mesh.verts[idx].props().normal[2]);
+				else EXPECT_DOUBLE_EQ(s, mesh.verts[idx].props().normal[2]);
 			}
 		}
 	}

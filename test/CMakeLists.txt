@@ -1,16 +1,38 @@
 
+#===============================================================================
+# Additional cmake modules
+#===============================================================================
+set (CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+message("CMAKE_MODULE_PATH: " ${CMAKE_MODULE_PATH})
+
+
+
+
 # required by GTest
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 
 
+
+
+
+
+find_package(gflags REQUIRED)
+if (GFLAGS_FOUND)
+    include_directories(${GFLAGS_INCLUDE_DIRS})
+    link_libraries(${GFLAGS_LIBRARIES})
+endif()
+
+
+
 set(sources
-	gtest-init.cpp
+	main.cpp
 	compute-normals.cpp
 	links.cpp
 	cap-holes.cpp
 	collapse-edges.cpp
+	const.cpp
 )
 
 if (SMESH_WITH_TINYPLY)
