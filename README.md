@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/atablash/smesh-accessors-old.svg?branch=master)](https://travis-ci.org/atablash/smesh)
+[![Build Status](https://travis-ci.org/atablash/smesh-accessors-old.svg?branch=master)](https://travis-ci.org/atablash/smesh-accessors-old)
 
 # Why?
 
